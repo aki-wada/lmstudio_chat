@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>Local LLM Chat</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#f1f3f5;margin:0;display:flex;flex-direction:column;height:100vh;}
+  header{background:#007bff;color:#fff;padding:10px 20px;font-size:1.05em;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  #chat{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column}
+  .message{margin:10px 0;max-width:80%;padding:10px 14px;border-radius:10px;line-height:1.55;position:relative}
+  .user{background:#007bff;color:#fff;align-self:flex-end}
+  .assistant{background:#fff;border:1px solid #ddd;color:#222;align-self:flex-start}
+  .system{background:#eee;color:#333;align-self:center;font-size:.9em;padding:6px 10px;border-radius:8px}
+  #input-area{display:flex;padding:10px;background:#fff;border-top:1px solid #ccc;gap:10px}
+  #prompt{flex:1;font-size:1em;padding:10px;border:1px solid #ccc;border-radius:8px;resize:none;height:56px;max-height:240px;overflow-y:auto}
+  button{padding:0 12px;height:36px;font-size:0.95em;border:none;border-radius:8px;background:#007bff;color:#fff;cursor:pointer}
+  button:hover{background:#0056b3}
+  button:disabled{background:#aaa;cursor:not-allowed}
+  input[type="text"]{padding:6px 8px;border-radius:6px;border:1px solid #ccc}
+  select{padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:.95em}
+  pre,code{background:#f8f9fa;border-radius:5px;padding:5px}
+  pre{overflow-x:auto}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .row.no-wrap{flex-wrap:nowrap;justify-content:space-between}
+  .row.no-wrap .btn-group{display:flex;gap:8px;flex-wrap:nowrap;flex-shrink:0}
+  .note{font-size:.9em;opacity:.9}
+  .settings-panel{background:#f8f9fa;border-bottom:1px solid #ddd;padding:12px 20px;display:none}
+  .settings-panel.open{display:block}
+  .settings-row{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .settings-row label{font-size:.9em;min-width:100px}
+  .settings-row input[type="range"]{width:150px}
+  .settings-row input[type="number"]{width:80px}
+  .settings-row textarea{width:100%;max-width:600px;min-height:60px}
+  .msg-actions{display:none;gap:6px;margin-top:8px}
+  .message:hover .msg-actions{display:flex}
+  .msg-btn{padding:4px 8px;font-size:.8em;height:auto;background:#e9ecef;color:#333}
+  .msg-btn:hover{background:#dee2e6}
+  #imagePreview{display:none;margin:10px 0;position:relative}
+  #imagePreview img{max-width:200px;max-height:200px;border-radius:8px;border:1px solid #ccc}
+  #imagePreview .remove-img{position:absolute;top:-8px;right:-8px;background:#dc3545;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.8em;line-height:1}
+  #imagePreview .remove-img:hover{background:#c82333}
+  .image-in-message{max-width:300px;max-height:300px;border-radius:8px;margin:8px 0;border:1px solid #ddd}
+  @media (max-width:768px){
+    header{font-size:.95em;padding:8px 12px}
+    #prompt{height:48px}
+    .message{max-width:90%}
+  }
+  /* === ダークモード === */
+  body.dark-mode{background:#1a1a1a;color:#e0e0e0}
+  body.dark-mode header{background:#2d2d2d}
+  body.dark-mode #chat{background:#1a1a1a}
+  body.dark-mode .user{background:#0056b3;color:#fff}
+  body.dark-mode .assistant{background:#2d2d2d;border:1px solid #444;color:#e0e0e0}
+  body.dark-mode .system{background:#333;color:#bbb}
+  body.dark-mode #input-area{background:#2d2d2d;border-top:1px solid #444}
+  body.dark-mode #prompt{background:#1a1a1a;border:1px solid #444;color:#e0e0e0}
+  body.dark-mode button{background:#0056b3}
+  body.dark-mode button:hover{background:#003d82}
+  body.dark-mode button:disabled{background:#555}
+  body.dark-mode input[type="text"],body.dark-mode select{background:#1a1a1a;border:1px solid #444;color:#e0e0e0}
+  body.dark-mode .settings-panel{background:#2d2d2d;border-bottom:1px solid #444}
+  body.dark-mode .settings-row textarea{background:#1a1a1a;border:1px solid #444;color:#e0e0e0}
+  body.dark-mode .msg-btn{background:#444;color:#e0e0e0}
+  body.dark-mode .msg-btn:hover{background:#555}
+  body.dark-mode pre,body.dark-mode code{background:#2d2d2d;color:#e0e0e0}
+  body.dark-mode .image-in-message{border:1px solid #444}
+  body.dark-mode #imagePreview img{border:1px solid #444}
+  body.dark-mode #filePreview{background:#2d2d2d;border:1px solid #444;color:#e0e0e0}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="row">
+    <strong>💬 Local LLM Chat</strong>
+    <span>モデル:</span>
+    <select id="modelSelect" title="ロードされているモデルIDを選択（自動同期）">
+      <!-- 起動時に /v1/models から自動生成 -->
+    </select>
+    <button id="refreshBtn">🔄 Refresh</button>
+  </div>
+  <div class="row">
+    <button id="clearBtn">🗑 Clear</button>
+    <button id="exportBtn">💾 Export</button>
+    <button id="settingsBtn">⚙️ Settings</button>
+  </div>
+</header>
+
+<div id="settingsPanel" class="settings-panel">
+  <div class="settings-row">
+    <label>
+      <input type="checkbox" id="darkModeToggle" />
+      🌙 Dark Mode
+    </label>
+  </div>
+  <div class="settings-row">
+    <label>🔗 Base URL:</label>
+    <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:220px" />
+    <span class="note">※ デフォルト: http://localhost:1234/v1</span>
+  </div>
+  <div class="settings-row">
+    <label>🔑 API Key:</label>
+    <input type="text" id="apiKey" value="lmstudio" style="width:150px" />
+    <span class="note">※ 通常は変更不要</span>
+  </div>
+  <div class="settings-row">
+    <label>Temperature (0-2):</label>
+    <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />
+    <span id="tempValue">0.7</span>
+    <span class="note">※ 低いと安定、高いと創造的</span>
+  </div>
+  <div class="settings-row">
+    <label>Max Tokens:</label>
+    <input type="number" id="maxTokens" min="1" max="8192" value="2048" />
+  </div>
+  <div class="settings-row">
+    <label>応答スタイル:</label>
+    <select id="responseStyle">
+      <option value="concise">簡潔（要点のみ）</option>
+      <option value="standard" selected>標準（バランス型）</option>
+      <option value="detailed">詳細（詳しい説明付き）</option>
+      <option value="professional">専門的（技術的詳細重視）</option>
+    </select>
+    <span class="note">※ AIの応答の詳しさを設定</span>
+  </div>
+  <div class="settings-row">
+    <label>👤 ユーザープロフィール</label>
+  </div>
+  <div class="settings-row">
+    <label>専門レベル:</label>
+    <select id="userLevel">
+      <option value="">指定なし</option>
+      <option value="beginner">初心者</option>
+      <option value="intermediate">中級者</option>
+      <option value="advanced">上級者</option>
+      <option value="expert">専門家</option>
+    </select>
+  </div>
+  <div class="settings-row">
+    <label>職業/専門分野:</label>
+    <input type="text" id="userProfession" placeholder="例: 放射線科医、学生、研究者" style="width:200px" />
+  </div>
+  <div class="settings-row">
+    <label>興味・関心:</label>
+    <input type="text" id="userInterests" placeholder="例: CT画像診断、機械学習" style="width:200px" />
+  </div>
+  <div class="settings-row">
+    <label>System Prompt:</label>
+    <textarea id="systemPrompt">You are a helpful Japanese-speaking assistant for a radiologist.</textarea>
+  </div>
+  <div class="settings-row" style="margin-top:16px">
+    <button id="closeSettingsBtn" style="background:#6c757d">← 戻る</button>
+  </div>
+</div>
+
+<div id="chat"></div>
+
+<div id="input-area">
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <label for="imageInput" style="padding:0 12px;height:36px;line-height:36px;font-size:0.95em;border:none;border-radius:8px;background:#28a745;color:#fff;cursor:pointer;text-align:center">
+      📷 Image
+    </label>
+    <input type="file" id="imageInput" accept="image/*" style="display:none" />
+    <label for="fileInput" style="padding:0 12px;height:36px;line-height:36px;font-size:0.95em;border:none;border-radius:8px;background:#6c757d;color:#fff;cursor:pointer;text-align:center">
+      📎 File
+    </label>
+    <input type="file" id="fileInput" accept=".txt,.md,.json,.csv,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.sh,.yaml,.yml,.log" style="display:none" />
+  </div>
+  <div style="display:flex;flex-direction:column;flex:1;gap:8px">
+    <div id="imagePreview" style="display:none">
+      <img id="previewImg" src="" alt="Preview" style="display:block" />
+      <button class="remove-img" id="removeImage">×</button>
+    </div>
+    <div id="filePreview" style="display:none;padding:8px;background:#f8f9fa;border-radius:8px;border:1px solid #ccc;font-size:0.9em">
+      <span id="fileName"></span>
+      <button class="remove-img" id="removeFile" style="position:relative;top:0;right:0;margin-left:8px">×</button>
+    </div>
+    <textarea id="prompt"
+              placeholder="メッセージを入力…（送信: Enter / 改行: Shift+Enter）"
+              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <button id="send">送信</button>
+    <button id="stopBtn" disabled>⏹ Stop</button>
+  </div>
+</div>
+
+<script>
+/* === 基本キー === */
+const STORAGE_KEY  = "chatHistory_auto_models";
+const SETTINGS_KEY = "chatSettings_auto_models";
+
+/* === 要素 === */
+const chatDiv      = document.getElementById("chat");
+const baseUrlEl    = document.getElementById("baseUrl");
+const apiKeyEl     = document.getElementById("apiKey");
+const modelSel     = document.getElementById("modelSelect");
+const promptEl     = document.getElementById("prompt");
+const sendBtn      = document.getElementById("send");
+const stopBtn      = document.getElementById("stopBtn");
+const refreshBtn   = document.getElementById("refreshBtn");
+const settingsBtn  = document.getElementById("settingsBtn");
+const settingsPanel= document.getElementById("settingsPanel");
+const temperatureEl= document.getElementById("temperature");
+const tempValueEl  = document.getElementById("tempValue");
+const maxTokensEl  = document.getElementById("maxTokens");
+const systemPromptEl=document.getElementById("systemPrompt");
+const imageInputEl = document.getElementById("imageInput");
+const imagePreviewEl=document.getElementById("imagePreview");
+const previewImgEl = document.getElementById("previewImg");
+const removeImageBtn=document.getElementById("removeImage");
+const fileInputEl  = document.getElementById("fileInput");
+const filePreviewEl= document.getElementById("filePreview");
+const fileNameEl   = document.getElementById("fileName");
+const removeFileBtn= document.getElementById("removeFile");
+const darkModeToggle= document.getElementById("darkModeToggle");
+const responseStyleEl=document.getElementById("responseStyle");
+const userLevelEl    = document.getElementById("userLevel");
+const userProfessionEl=document.getElementById("userProfession");
+const userInterestsEl= document.getElementById("userInterests");
+
+let controller = null;             // AbortController for Stop
+let availableModels = new Set();   // /v1/models の正確なID一覧
+let currentImageData = null;       // 選択中の画像データ（base64）
+let currentFileData = null;        // 選択中のファイルデータ
+let currentFileName = null;        // 選択中のファイル名
+
+/* === 設定ロード/保存 === */
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+if (settings.baseUrl) baseUrlEl.value = settings.baseUrl;
+if (settings.apiKey)  apiKeyEl.value  = settings.apiKey;
+if (settings.temperature !== undefined) {
+  temperatureEl.value = settings.temperature;
+  tempValueEl.textContent = settings.temperature;
+}
+if (settings.maxTokens) maxTokensEl.value = settings.maxTokens;
+if (settings.systemPrompt) systemPromptEl.value = settings.systemPrompt;
+if (settings.responseStyle) responseStyleEl.value = settings.responseStyle;
+if (settings.userLevel) userLevelEl.value = settings.userLevel;
+if (settings.userProfession) userProfessionEl.value = settings.userProfession;
+if (settings.userInterests) userInterestsEl.value = settings.userInterests;
+
+// ダークモード設定の復元
+if (settings.darkMode) {
+  document.body.classList.add("dark-mode");
+  darkModeToggle.checked = true;
+}
+
+function saveSettings(){
+  settings = {
+    baseUrl: baseUrlEl.value.trim(),
+    apiKey : apiKeyEl.value.trim(),
+    model  : modelSel.value,
+    temperature: parseFloat(temperatureEl.value),
+    maxTokens: parseInt(maxTokensEl.value),
+    systemPrompt: systemPromptEl.value,
+    responseStyle: responseStyleEl.value,
+    userLevel: userLevelEl.value,
+    userProfession: userProfessionEl.value.trim(),
+    userInterests: userInterestsEl.value.trim(),
+    darkMode: document.body.classList.contains("dark-mode")
+  };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+baseUrlEl.onchange = apiKeyEl.onchange = saveSettings;
+temperatureEl.oninput = () => {
+  tempValueEl.textContent = temperatureEl.value;
+  saveSettings();
+};
+maxTokensEl.onchange = systemPromptEl.onchange = responseStyleEl.onchange = saveSettings;
+userLevelEl.onchange = userProfessionEl.onchange = userInterestsEl.onchange = saveSettings;
+
+/* === 履歴ロード === */
+let messages = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+messages.forEach(m => appendMessage(m.role, m.content, false, m.imageData));
+
+function appendMessage(role, content, save=true, imageData=null){
+  const div = document.createElement("div");
+  div.classList.add("message", role);
+
+  // メッセージデータを保存（Regenerate用）
+  div.dataset.content = content;
+  if (imageData) div.dataset.imageData = imageData;
+
+  // 画像がある場合は画像を表示
+  if (imageData && role === "user") {
+    const img = document.createElement("img");
+    img.src = imageData;
+    img.classList.add("image-in-message");
+    div.appendChild(img);
+  }
+
+  const textDiv = document.createElement("div");
+  textDiv.classList.add("message-content");
+  textDiv.innerHTML = (role === "assistant") ? marked.parse(content) : content;
+
+  // テキストを追加
+  div.appendChild(textDiv);
+
+  // メッセージアクションボタン（systemメッセージ以外）
+  if (role !== "system") {
+    const actions = document.createElement("div");
+    actions.classList.add("msg-actions");
+
+    const copyBtn = document.createElement("button");
+    copyBtn.classList.add("msg-btn");
+    copyBtn.textContent = "📋 Copy";
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(div.dataset.content);
+      notify("✅ コピーしました");
+    };
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.classList.add("msg-btn");
+    deleteBtn.textContent = "🗑 Delete";
+    deleteBtn.onclick = () => {
+      // contentで配列内のインデックスを検索
+      const msgContent = div.dataset.content;
+      const idx = messages.findIndex(m => m.role === role && m.content === msgContent);
+      if (idx !== -1) {
+        messages.splice(idx, 1);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      }
+      div.remove();
+      notify("✅ メッセージを削除しました");
+    };
+
+    actions.appendChild(copyBtn);
+    actions.appendChild(deleteBtn);
+
+    // 再生成ボタン（assistantメッセージのみ）
+    if (role === "assistant") {
+      const regenBtn = document.createElement("button");
+      regenBtn.classList.add("msg-btn");
+      regenBtn.textContent = "🔄 Regenerate";
+      regenBtn.onclick = () => {
+        // このassistantメッセージを削除
+        const msgContent = div.dataset.content;
+        const idx = messages.findIndex(m => m.role === "assistant" && m.content === msgContent);
+        if (idx !== -1) {
+          messages.splice(idx, 1);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+        }
+        div.remove();
+
+        // 送信ボタンをクリックして再生成
+        if (messages.length > 0 && messages[messages.length - 1].role === "user") {
+          sendBtn.click();
+        } else {
+          notify("⚠️ 再生成するユーザーメッセージがありません");
+        }
+      };
+      actions.appendChild(regenBtn);
+    }
+
+    div.appendChild(actions);
+  }
+
+  chatDiv.appendChild(div);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+  if (save){
+    messages.push({ role, content, imageData });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }
+}
+function notify(text){ appendMessage("system", text, false); }
+
+/* === /v1/models → プルダウン自動生成 === */
+async function refreshModels(){
+  availableModels.clear();
+  const base = (settings.baseUrl || baseUrlEl.value.trim() || "").replace(/\/+$/,"");
+  const key  = settings.apiKey  || apiKeyEl.value.trim();
+
+  // 一時的にロード中表示
+  modelSel.innerHTML = "<option>Loading...</option>";
+  try{
+    const r = await fetch(`${base}/models`, { headers:{ "Authorization": `Bearer ${key}` } });
+    if (!r.ok) throw new Error(String(r.status));
+    const data = await r.json();
+    const allModels = (data.data || []).map(m => m.id);
+    
+    // 埋め込みモデル（text embedding）を除外
+    const EMBEDDING_KEYWORDS = ['embed', 'embedding', 'bge', 'e5-', 'gte-', 'jina'];
+    const list = allModels.filter(id => {
+      const lowerId = id.toLowerCase();
+      return !EMBEDDING_KEYWORDS.some(keyword => lowerId.includes(keyword));
+    });
+
+    // 正式に構築し直し（表示名は末尾を簡略）
+    modelSel.innerHTML = "";
+    list.forEach(id => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = id.replace(/^.*\//, "");
+      modelSel.appendChild(opt);
+      availableModels.add(id);
+    });
+
+    // ベストな選択肢を決定：保存済み → Gemma → LLaMA → Qwen → 先頭
+    const preferred = settings.model;
+    const fallbacks = [
+      preferred,
+      "google/gemma-3-12b",
+      "llama-3.1-swallow-8b-instruct-v0.5",
+      "qwen/qwen3-4b-2507",
+      list[0]
+    ].filter(Boolean);
+
+    let chosen = null;
+    for (const cand of fallbacks) {
+      if (availableModels.has(cand)) { chosen = cand; break; }
+    }
+    if (chosen) modelSel.value = chosen;
+
+    // 起動時通知（任意）
+    // notify(`✅ モデル一覧を取得: ${list.length}件`);
+    saveSettings();
+  }catch(e){
+    modelSel.innerHTML = "";
+    notify("⚠️ モデル一覧を取得できませんでした。Base/KeyとServer状態を確認してください。");
+  }
+}
+// 起動時に同期
+refreshModels();
+refreshBtn.onclick = refreshModels;
+
+/* === 応答スタイルの説明を取得 === */
+function getResponseStyleInstruction(){
+  const style = responseStyleEl.value || "standard";
+  const styleInstructions = {
+    concise: "\n\n【応答スタイル】簡潔に要点のみを述べてください。冗長な説明は避け、核心的な情報のみを提供してください。",
+    standard: "", // 標準の場合は追加の指示なし
+    detailed: "\n\n【応答スタイル】詳細な説明を心がけてください。背景情報、理由、具体例などを含めて丁寧に説明してください。",
+    professional: "\n\n【応答スタイル】専門的で技術的な詳細を重視してください。学術的な正確性を保ち、専門用語を適切に使用し、エビデンスや根拠を明示してください。"
+  };
+  return styleInstructions[style] || "";
+}
+
+/* === ユーザープロフィール情報を取得 === */
+function getUserProfileInstruction(){
+  const level = userLevelEl.value;
+  const profession = userProfessionEl.value.trim();
+  const interests = userInterestsEl.value.trim();
+
+  if (!level && !profession && !interests) return "";
+
+  let profile = "\n\n【ユーザー情報】";
+
+  // 専門レベルに応じた説明スタイル
+  const levelInstructions = {
+    beginner: "ユーザーは初心者です。専門用語を避け、基礎から丁寧に説明してください。",
+    intermediate: "ユーザーは中級者です。基本的な知識は持っているものとして、適度な専門用語を使用して説明してください。",
+    advanced: "ユーザーは上級者です。専門的な内容を深く掘り下げて説明してください。",
+    expert: "ユーザーは専門家です。高度な専門知識を前提とし、最新の研究や詳細な技術的議論を含めてください。"
+  };
+
+  if (level && levelInstructions[level]) {
+    profile += "\n- " + levelInstructions[level];
+  }
+
+  if (profession) {
+    profile += `\n- 職業/専門分野: ${profession}`;
+  }
+
+  if (interests) {
+    profile += `\n- 興味・関心: ${interests}`;
+  }
+
+  return profile;
+}
+
+/* === 会話整形（system先頭・交互・直近12）=== */
+function buildConversation(){
+  const baseSysPrompt = systemPromptEl.value || "You are a helpful Japanese-speaking assistant for a radiologist.";
+  const styleInstruction = getResponseStyleInstruction();
+  const profileInstruction = getUserProfileInstruction();
+  const sysPrompt = baseSysPrompt + styleInstruction + profileInstruction;
+
+  const conv = [{ role:"system", content: sysPrompt }];
+  let last = "system";
+  for (const m of messages){
+    if (!["user","assistant"].includes(m.role)) continue;
+    if (m.role === last) continue;
+
+    // Vision API形式に変換
+    if (m.imageData && m.role === "user") {
+      const contentArray = [];
+      if (m.content) {
+        contentArray.push({ type: "text", text: m.content });
+      }
+      contentArray.push({
+        type: "image_url",
+        image_url: { url: m.imageData }
+      });
+      conv.push({ role: m.role, content: contentArray });
+    } else {
+      conv.push({ role: m.role, content: m.content });
+    }
+    last = m.role;
+  }
+  if (conv.length > 1 && conv.at(-1).role === "assistant") conv.pop();
+  return conv.slice(-12);
+}
+
+/* === 入力欄“強いクリア”：最後の1文残り対策 === */
+function strongClearPrompt(){
+  promptEl.value = "";
+  promptEl.dispatchEvent(new Event("input", { bubbles:true }));
+  promptEl.setSelectionRange(0, 0);
+  promptEl.blur();
+  setTimeout(()=>{ promptEl.value=""; },0);
+  setTimeout(()=>{ promptEl.focus(); },10);
+}
+
+/* === 送信 === */
+sendBtn.onclick = async () => {
+  let text = promptEl.value.trim();
+  if (!text && !currentImageData && !currentFileData) return;
+
+  // 事前バリデーション：選択モデルがAPI上に存在しないなら中止
+  const base = (settings.baseUrl || baseUrlEl.value.trim()).replace(/\/+$/,"");
+  const key  = settings.apiKey  || apiKeyEl.value.trim();
+  const model= settings.model   || modelSel.value;
+
+  if (!availableModels.size || !availableModels.has(model)){
+    notify(`⚠️ 選択モデルが /v1/models に見つかりません: ${model}`);
+    return;
+  }
+
+  // 画像データを保存
+  const imageData = currentImageData;
+
+  // ファイルが添付されている場合、テキストに追加
+  let displayText = text;
+  if (currentFileData) {
+    const fileContent = `\n\n---\n📄 **添付ファイル: ${currentFileName}**\n\`\`\`\n${currentFileData}\n\`\`\``;
+    text = text ? text + fileContent : `ファイル「${currentFileName}」の内容:${fileContent}`;
+    displayText = text ? `${promptEl.value.trim()}\n\n📎 添付: ${currentFileName}` : `📎 添付: ${currentFileName}`;
+  }
+
+  appendMessage("user", displayText || "(画像のみ)", true, imageData);
+  strongClearPrompt();
+
+  // 画像プレビューをクリア
+  if (currentImageData) {
+    removeImageBtn.click();
+  }
+
+  // ファイルプレビューをクリア
+  if (currentFileData) {
+    removeFileBtn.click();
+  }
+  appendMessage("assistant", "...", false);
+
+  const current = chatDiv.lastChild;
+
+  controller = new AbortController();
+  stopBtn.disabled = false;
+  sendBtn.disabled = true;
+
+  try{
+    // 最後のユーザーメッセージを構築
+    let userMessage;
+    if (imageData) {
+      const contentArray = [];
+      if (text) {
+        contentArray.push({ type: "text", text });
+      }
+      contentArray.push({
+        type: "image_url",
+        image_url: { url: imageData }
+      });
+      userMessage = { role: "user", content: contentArray };
+    } else {
+      userMessage = { role: "user", content: text };
+    }
+
+    const res = await fetch(`${base}/chat/completions`, {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":`Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [...buildConversation(), userMessage],
+        stream:true,
+        temperature: parseFloat(temperatureEl.value) || 0.7,
+        max_tokens: parseInt(maxTokensEl.value) || 2048
+      }),
+      signal: controller.signal
+    });
+
+    if (!res.ok || !res.body){
+      const t = await res.text().catch(()=> "");
+      const contentEl = current.querySelector(".message-content");
+      if (contentEl) contentEl.textContent = `エラー:${res.status}${t ? " / "+t : ""}`;
+      return;
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buf = "", content = "";
+
+    while (true){
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buf += decoder.decode(value, { stream:true });
+      const events = buf.split("\n\n");
+      buf = events.pop() || "";
+
+      for (const ev of events){
+        const lines = ev.split("\n").filter(l=>l.startsWith("data: ")).map(l=>l.slice(6));
+        if (!lines.length) continue;
+
+        const payload = lines.join("\n");
+        if (payload === "[DONE]"){
+          const contentEl = current.querySelector(".message-content");
+          if (contentEl) contentEl.innerHTML = marked.parse(content || "(空応答)");
+          current.dataset.content = content;  // コピー機能用にデータを更新
+          messages.push({ role:"assistant", content });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+          stopBtn.disabled = true;
+          controller = null;
+          return;
+        }
+        try{
+          const j = JSON.parse(payload);
+          const delta = j.choices?.[0]?.delta?.content ?? j.choices?.[0]?.text ?? "";
+          if (delta){
+            content += delta;
+            const contentEl = current.querySelector(".message-content");
+            if (contentEl) contentEl.innerHTML = marked.parse(content);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+          }
+        }catch{/* 不完全JSONは次チャンクで完成 */}
+      }
+    }
+  }catch(e){
+    const contentEl = current.querySelector(".message-content");
+    if (e.name === "AbortError"){
+      if (contentEl) contentEl.innerHTML = marked.parse("⏹ **生成を停止しました。**");
+    }else{
+      if (contentEl) contentEl.textContent = `通信エラー: ${e}`;
+    }
+  }finally{
+    stopBtn.disabled = true;
+    sendBtn.disabled = false;
+    controller = null;
+  }
+};
+
+/* === Stop === */
+stopBtn.onclick = () => { if (controller) controller.abort(); };
+
+/* === Enter送信：IME変換中は送信しない === */
+promptEl.addEventListener("keydown", e => {
+  if (e.isComposing || e.keyCode === 229) return; // 日本語IME変換中は無視
+  if (e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    sendBtn.click();
+  }
+});
+
+/* === モデル選択時：保存＆通知 === */
+modelSel.addEventListener("change", e => {
+  saveSettings();
+  const id = e.target.value;
+  notify(`🔄 モデルを ${id} に切り替えました`);
+});
+
+/* === Export / Clear === */
+document.getElementById("exportBtn").onclick = () => {
+  const blob = new Blob([JSON.stringify(messages,null,2)], { type:"application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = `chat_history_${new Date().toISOString().slice(0,19)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.getElementById("clearBtn").onclick = () => {
+  if (!confirm("履歴をすべて削除しますか？")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  messages = [];
+  chatDiv.innerHTML = "";
+  notify("🗑 会話履歴を削除しました。");
+};
+
+/* === 設定パネルのトグル === */
+settingsBtn.onclick = () => {
+  settingsPanel.classList.toggle("open");
+};
+
+// 設定パネルの「戻る」ボタン
+document.getElementById("closeSettingsBtn").onclick = () => {
+  settingsPanel.classList.remove("open");
+};
+
+/* === 入力欄の自動拡張 === */
+promptEl.addEventListener("input", () => {
+  promptEl.style.height = "56px";
+  const newHeight = Math.min(promptEl.scrollHeight, 240);
+  promptEl.style.height = newHeight + "px";
+});
+
+/* === キーボードショートカット === */
+document.addEventListener("keydown", e => {
+  // Ctrl+K または Cmd+K でクリア
+  if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+    e.preventDefault();
+    document.getElementById("clearBtn").click();
+  }
+  // Esc で設定パネルを閉じる
+  if (e.key === "Escape" && settingsPanel.classList.contains("open")) {
+    settingsPanel.classList.remove("open");
+  }
+});
+
+/* === 画像選択とプレビュー === */
+imageInputEl.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // ファイルタイプチェック
+  if (!file.type.startsWith("image/")) {
+    notify("⚠️ 画像ファイルを選択してください");
+    imageInputEl.value = "";
+    return;
+  }
+
+  // ファイルサイズチェック（20MB以下）
+  if (file.size > 20 * 1024 * 1024) {
+    notify("⚠️ 画像サイズは20MB以下にしてください");
+    imageInputEl.value = "";
+    return;
+  }
+
+  // 画像をbase64エンコード
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    currentImageData = event.target.result;
+    previewImgEl.src = currentImageData;
+    previewImgEl.style.display = "block";
+    imagePreviewEl.style.display = "block";
+    notify("✅ 画像を添付しました");
+  };
+  reader.onerror = () => {
+    notify("⚠️ 画像の読み込みに失敗しました");
+    imageInputEl.value = "";
+  };
+  reader.readAsDataURL(file);
+});
+
+// 画像削除
+removeImageBtn.onclick = () => {
+  currentImageData = null;
+  previewImgEl.src = "";
+  previewImgEl.style.display = "none";
+  imagePreviewEl.style.display = "none";
+  imageInputEl.value = "";
+};
+
+/* === ファイル選択とプレビュー === */
+fileInputEl.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // ファイルサイズチェック（1MB以下）
+  if (file.size > 1 * 1024 * 1024) {
+    notify("⚠️ ファイルサイズは1MB以下にしてください");
+    return;
+  }
+
+  // テキストファイルとして読み込み
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    currentFileData = event.target.result;
+    currentFileName = file.name;
+    fileNameEl.textContent = `📄 ${file.name}`;
+    filePreviewEl.style.display = "block";
+    notify(`✅ ファイル「${file.name}」を添付しました`);
+  };
+  reader.onerror = () => {
+    notify("⚠️ ファイルの読み込みに失敗しました");
+  };
+  reader.readAsText(file);
+});
+
+// ファイル削除
+removeFileBtn.onclick = () => {
+  currentFileData = null;
+  currentFileName = null;
+  fileNameEl.textContent = "";
+  filePreviewEl.style.display = "none";
+  fileInputEl.value = "";
+};
+
+/* === ダークモード切り替え === */
+darkModeToggle.onchange = () => {
+  if (darkModeToggle.checked) {
+    document.body.classList.add("dark-mode");
+  } else {
+    document.body.classList.remove("dark-mode");
+  }
+  saveSettings();
+};
+
+/* === 画像のペースト対応 === */
+document.addEventListener("paste", (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+
+  for (const item of items) {
+    // 画像アイテムを探す
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+
+      const file = item.getAsFile();
+      if (!file) continue;
+
+      // ファイルサイズチェック（20MB以下）
+      if (file.size > 20 * 1024 * 1024) {
+        notify("⚠️ 画像サイズは20MB以下にしてください");
+        return;
+      }
+
+      // 画像をbase64エンコード
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        currentImageData = event.target.result;
+        previewImgEl.src = currentImageData;
+        previewImgEl.style.display = "block";
+        imagePreviewEl.style.display = "block";
+        notify("✅ 画像がペーストされました");
+      };
+      reader.readAsDataURL(file);
+      break;
+    }
+  }
+});
+
+/* === 画像のドラッグ＆ドロップ対応 === */
+// ドラッグオーバー時のデフォルト動作を防止
+document.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+});
+
+document.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  document.body.style.opacity = "0.7";
+});
+
+document.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  // 画面外に出た時のみ opacity をリセット
+  if (e.relatedTarget === null) {
+    document.body.style.opacity = "1";
+  }
+});
+
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  document.body.style.opacity = "1";
+
+  const files = e.dataTransfer?.files;
+  if (!files || files.length === 0) return;
+
+  const file = files[0];
+
+  // 画像ファイルかチェック
+  if (!file.type.startsWith("image/")) {
+    notify("⚠️ 画像ファイルをドロップしてください");
+    return;
+  }
+
+  // ファイルサイズチェック（20MB以下）
+  if (file.size > 20 * 1024 * 1024) {
+    notify("⚠️ 画像サイズは20MB以下にしてください");
+    return;
+  }
+
+  // 画像をbase64エンコード
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    currentImageData = event.target.result;
+    previewImgEl.src = currentImageData;
+    previewImgEl.style.display = "block";
+    imagePreviewEl.style.display = "block";
+    notify("✅ 画像をドロップしました");
+  };
+  reader.onerror = () => {
+    notify("⚠️ 画像の読み込みに失敗しました");
+  };
+  reader.readAsDataURL(file);
+});
+</script>
+</body>
+</html>
