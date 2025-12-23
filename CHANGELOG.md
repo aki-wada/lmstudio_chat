@@ -5,6 +5,112 @@ All notable changes to Local LLM Chat will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2025-12-23
+
+### Changed
+- **バージョン番号整理** - v1.6.2 から v1.6.3 へ移行
+  - 内容は v1.6.2 と同一
+
+---
+
+## [1.6.2] - 2025-12-23
+
+### Fixed
+- **重複メッセージ送信バグ** - 同じメッセージがAPIに2回送信される問題を修正
+  - UI表示用と履歴保存用のメッセージ処理を分離
+  - `save: false`オプションでUI表示時は履歴に保存しないように修正
+- **ストリーミングエラー時のコンテンツ消失** - 応答生成中にエラーが発生しても部分コンテンツを保持
+  - `dataset.partialContent`で生成中のコンテンツを追跡
+  - エラー発生時は生成済み内容を保持し、エラーメッセージを追記
+- **キャッシュバスティング追加** - JS/CSSファイルにバージョンパラメータを追加
+  - ブラウザキャッシュによる古いコードの実行を防止
+
+### Added
+- **送信キー設定** - Enter送信とCtrl+Enter送信を設定で切り替え可能
+  - 「Enter で送信」: 従来通りEnterで送信、Shift+Enterで改行
+  - 「Ctrl+Enter で送信」: Enterで改行、Ctrl+Enter（Mac: Cmd+Enter）で送信
+- **デバッグログ機能** - 開発者向けのコンソールログ出力
+  - `loadHistory`, `persistHistory`, `buildConversation`, API送信時のログ
+
+---
+
+## [1.6.1] - 2025-12-22
+
+### Added
+- **Vision対応モデル表示** - モデルドロップダウンにVision対応モデルを👁️アイコンで表示
+  - 対応キーワード: vision, llava, gemma-3, pixtral, devstral, magistral, qwen3-vl, qwen2-vl, など
+- **モデル一覧のアルファベット順ソート** - 見つけやすさ向上
+- **画像サムネイルプレビュー** - 添付画像を48x48pxのサムネイルで表示
+- **メッセージ編集機能** - ユーザーメッセージの✏️ Editボタンで編集・再送信可能
+- **深掘りモード** - 🔍深掘りボタンでより詳細で分析的な回答を促す
+  - 多角的分析、根本原因、異なる視点、関連概念、実践的応用を含む回答
+
+---
+
+## [1.6] - 2025-12-22
+
+### Added
+- **設定リセット機能** - 設定をデフォルトに戻すボタン
+- **全データクリア機能** - すべての保存データを削除するボタン
+- **複数ファイル添付** - 画像・ファイルを複数同時に添付可能
+
+### Changed
+- **外部ファイル分割** - HTML + CSS + JS構成（保守性向上）
+- **日本語化システムプロンプト** - 放射線画像診断向けデフォルトプロンプト
+- **ヘッダーレイアウト変更** - タイトル中央、モデル選択、ボタン群の3段構成
+- **送信ボタン変更** - 「🚀 Send」に統一
+
+### Technical Details
+- ファイル構成: `lmstudio_chat_v1.6/` ディレクトリ
+- localStorageキー: `chatHistory_v1.6`, `chatSettings_v1.6`, `chatPresets_v1.6`
+
+---
+
+## [1.4] - 2025-12-18
+
+### Changed
+- **コードリファクタリング** - 保守性・可読性の大幅向上
+  - IIFE（即時実行関数式）でグローバルスコープ汚染を防止
+  - JSDoc による型定義の追加（StoredMessage, Settings 等）
+  - 定数の一元管理（STORAGE_KEYS, LIMITS, EMBEDDING_KEYWORDS）
+  - DOM参照を `el` オブジェクトに集約（Single Source of Truth）
+  - 状態管理を `runtime`, `attach` オブジェクトに分離
+  - 機能ごとにセクション分割（Settings, Chat UI, SSE, Presets 等）
+  - SSE処理を `consumeSSE()` 関数に抽出
+  - イベント配線を `wireSettingsEvents()` 等に分離
+  - `Object.freeze()` による定数の不変性保証
+
+### Technical Details
+- HTML + 外部アセット構成（変更なし）
+- データ保存: localStorage（キー: `chatHistory_v1.4`, `chatSettings_v1.4`, `chatPresets_v1.4`）
+
+---
+
+## [1.3] - 2025-12-17
+
+### Added
+- **プリセットプロンプト機能** - 📋 Preset ボタンで構造化テンプレートを挿入（6種類）
+  - 🏥 疾患解説、💊 鑑別診断、📄 文章要約
+  - 📝 論文査読、🔬 リサーチデザイン、📈 統計解析
+- **プリセット編集機能** - Settings パネルでプリセット内容をカスタマイズ可能
+- **完全オフライン対応** - 外部ライブラリをローカルに同梱
+  - `assets/app.css` - スタイルシート
+  - `assets/marked.min.js` - Markdown レンダリング
+  - `assets/pdf.min.js` - PDF テキスト抽出
+  - `assets/pdf.worker.min.js` - PDF.js Worker
+
+### Changed
+- ファイル名を `local_llm_chat_v1.3.html` に変更
+- CDN依存を完全に排除（閉域ネットワーク対応）
+- スタイルシートを外部ファイル化（app.css）
+
+### Technical Details
+- HTML + 外部アセット構成
+- 外部依存: marked.js, PDF.js（すべてローカル同梱）
+- データ保存: localStorage（キー: `chatHistory_v1.3`, `chatSettings_v1.3`）
+
+---
+
 ## [1.1.0] - 2025-11-29
 
 ### Added
@@ -127,5 +233,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **バージョン履歴**
 
+- [1.6.3] - 2025-12-23 - v1.6.2 からのバージョン番号整理
+- [1.6.2] - 2025-12-23 - 重複メッセージバグ修正、送信キー設定、デバッグログ
+- [1.6.1] - 2025-12-22 - Vision対応表示、メッセージ編集、深掘りモード
+- [1.6] - 2025-12-22 - 設定リセット、複数ファイル添付、外部ファイル分割
+- [1.4] - 2025-12-18 - コードリファクタリング、保守性向上
+- [1.3] - 2025-12-17 - プリセットプロンプト機能、完全オフライン対応
 - [1.1.0] - 2025-11-29 - アプリ名変更、ファイル添付、ドラッグ＆ドロップ対応、UI改善
 - [1.0.0] - 2025-11-23 - 初回リリース
