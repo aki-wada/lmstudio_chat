@@ -11,6 +11,34 @@ All notable changes to Local LLM Chat will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-02-02
+
+### Added
+- **Apple Silicon Mac メモリ別運用ガイド** - MANUAL.mdに追加
+  - 16GB / 24GB Mac向けの詳細な運用指針
+  - 推奨モデルサイズ、context length、parallelの安全な組み合わせ
+  - メモリ不足のサイン・対処法
+- **ハンズオン向け推奨モデル（MLX 4-bit）** - 具体的なモデル名を記載
+  - 16GB: Gemma 3 4B / Qwen 3 4B
+  - 24GB: Gemma 3 12B / Qwen 3 8B / gpt-oss 20B
+- **gpt-oss 20B対応** - OpenAI初のオープンソースモデルを推奨リストに追加
+- **localStorageマイグレーション機能** - 旧キー名から新キー名への自動移行
+
+### Changed
+- **localStorageキー名** - バージョン非依存の命名に変更
+  - `chatHistory_v1.6` → `localLLMChat_history`
+  - `chatSettings_v1.6` → `localLLMChat_settings`
+  - `chatPresets_v1.6` → `localLLMChat_presets`
+  - `chatDraft_v1.6` → `localLLMChat_draft`
+  - `chatPresetLabels_v1.6` → `localLLMChat_presetLabels`
+- **CORS関連記載削除** - LM Studio v0.4.xでは不要のため
+
+### Technical Details
+- 旧バージョンからのデータ移行は自動で行われる（マイグレーション関数）
+- 新キーにデータがある場合は旧キーを削除（新データ優先）
+
+---
+
 ## [1.7.0] - 2026-02-01
 
 ### Added
@@ -368,6 +396,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **バージョン履歴**
 
+- [1.7.1] - 2026-02-02 - Apple Siliconメモリガイド、MLX推奨モデル、localStorageキー名変更
 - [1.7.0] - 2026-02-01 - モデル比較機能、モデルリスト自動更新、ヘッダーUI改善
 - [1.6.8] - 2026-01-21 - 新しい話題ボタン、ヘッダーボタン簡略化、鑑別診断プリセット更新
 - [1.6.7] - 2026-01-20 - 信頼度表示、代替候補表示、会話履歴インポート、Regenerate修正、Open Responses API対応
