@@ -11,13 +11,19 @@ All notable changes to Local LLM Chat will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.1] - 2026-02-02
+## [1.7.2] - 2026-02-04
 
 ### Added
 - **🏥 医学用語チェック機能** - 送信前に不正確な医学用語をLLMでチェック
   - 設定で有効化（デフォルト: OFF）
   - 問題発見時にダイアログで修正候補を表示
   - 「修正して送信」「そのまま送信」「キャンセル」から選択可能
+
+---
+
+## [1.7.1] - 2026-02-02
+
+### Added
 - **Apple Silicon Mac メモリ別運用ガイド** - MANUAL.mdに追加
   - 16GB / 24GB Mac向けの詳細な運用指針
   - 推奨モデルサイズ、context length、parallelの安全な組み合わせ

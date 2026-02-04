@@ -1,5 +1,5 @@
 /**
- * Local LLM Chat v1.7.1
+ * Local LLM Chat v1.7.2
  * =====================
  * OpenAI互換API向けの簡易チャットUIです。
  *
@@ -16,6 +16,9 @@
  *   - localLLMChat_presets      : プリセットのカスタム文面
  *   - localLLMChat_presetLabels : プリセットのラベル
  *   - localLLMChat_draft        : 入力中の下書き
+ *
+ * v1.7.2 新機能 (2026-02-04):
+ *   - 🏥 医学用語チェック: 送信前に不正確な医学用語をLLMでチェック
  *
  * v1.7.1 新機能 (2026-02-02):
  *   - 📊 モデル比較機能: 2つのモデルの回答を並べて比較表示
@@ -183,6 +186,7 @@
     userInterests: "",
     darkMode: false,
     showLogprobs: false,  // v1.6.7: 信頼度・代替候補表示
+    medicalTermCheck: false,  // v1.7.2: 医学用語チェック
   });
 
   // ---------------------------------------------------------------------------
@@ -219,6 +223,16 @@
     userInterests: document.getElementById("userInterests"),
     darkModeToggle: document.getElementById("darkModeToggle"),
     showLogprobsToggle: document.getElementById("showLogprobsToggle"),  // v1.6.7
+    medicalTermCheckToggle: document.getElementById("medicalTermCheckToggle"),  // v1.7.2
+
+    // v1.7.2: 医学用語チェックモーダル
+    termCheckModal: document.getElementById("termCheckModal"),
+    termCheckContent: document.getElementById("termCheckContent"),
+    termCheckCorrected: document.getElementById("termCheckCorrected"),
+    termCheckCorrectedText: document.getElementById("termCheckCorrectedText"),
+    termCheckCancel: document.getElementById("termCheckCancel"),
+    termCheckAsIs: document.getElementById("termCheckAsIs"),
+    termCheckApply: document.getElementById("termCheckApply"),
 
     // v1.6: data management
     resetSettingsBtn: document.getElementById("resetSettingsBtn"),
@@ -675,6 +689,11 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
     if (el.showLogprobsToggle) {
       el.showLogprobsToggle.checked = Boolean(settings.showLogprobs);
     }
+
+    // v1.7.2: 医学用語チェック設定
+    if (el.medicalTermCheckToggle) {
+      el.medicalTermCheckToggle.checked = Boolean(settings.medicalTermCheck);
+    }
   }
 
   /** UI → settingsへ反映し保存 */
@@ -693,6 +712,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       userInterests: el.userInterests.value.trim(),
       darkMode: document.body.classList.contains("dark-mode"),
       showLogprobs: el.showLogprobsToggle?.checked || false,  // v1.6.7
+      medicalTermCheck: el.medicalTermCheckToggle?.checked || false,  // v1.7.2
     };
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }
@@ -1827,6 +1847,29 @@ ${APP_MANUAL_CONTENT}
       return;
     }
 
+    // v1.7.2: 医学用語チェック（有効時、テキストがある場合のみ）
+    if (settings.medicalTermCheck && text && text.length > 0) {
+      notify("🏥 医学用語をチェック中...");
+      const checkResult = await checkMedicalTerminology(text);
+
+      if (checkResult) {
+        const modalResult = await showTermCheckModal(text, checkResult);
+
+        if (modalResult.action === "cancel") {
+          // 入力欄にテキストを戻す
+          el.prompt.value = text;
+          autoResizeTextarea(el.prompt);
+          return;
+        }
+
+        if (modalResult.action === "apply" && modalResult.text !== text) {
+          // 修正後のテキストを使用
+          text = modalResult.text;
+          notify("✅ 修正後のテキストで送信します");
+        }
+      }
+    }
+
     // v1.7.0: 比較モード時は専用の処理へ分岐
     if (compareMode) {
       const compareModel = el.compareModelSelect?.value;
@@ -2145,6 +2188,161 @@ ${APP_MANUAL_CONTENT}
 
   function handleStop() {
     if (runtime.controller) runtime.controller.abort();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Medical Terminology Check (v1.7.2)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 医学用語チェックのプロンプト
+   */
+  const MEDICAL_TERM_CHECK_PROMPT = `あなたは医学用語の専門家です。以下のテキストに含まれる医学用語をチェックしてください。
+
+チェック対象テキスト:
+"""
+{TEXT}
+"""
+
+以下のJSON形式で回答してください（他の文章は不要）:
+{
+  "hasIssues": true/false,
+  "issues": [
+    {
+      "original": "誤った用語",
+      "suggested": "正しい用語",
+      "reason": "理由"
+    }
+  ],
+  "correctedText": "修正後のテキスト全文（問題がない場合は元のテキスト）"
+}
+
+注意:
+- 明らかな誤りのみ指摘してください（略語、俗語は許容）
+- 問題がなければ hasIssues: false を返してください
+- 必ず有効なJSONのみを返してください`;
+
+  /**
+   * 医学用語チェックを実行
+   * @param {string} text - チェック対象テキスト
+   * @returns {Promise<{hasIssues: boolean, issues: Array<{original: string, suggested: string, reason: string}>, correctedText: string}|null>}
+   */
+  async function checkMedicalTerminology(text) {
+    const base = trimTrailingSlashes(settings.baseUrl || el.baseUrl.value.trim());
+    const key = settings.apiKey || el.apiKey.value.trim();
+    const model = el.modelSelect.value || settings.model;
+
+    if (!model || !text.trim()) return null;
+
+    const prompt = MEDICAL_TERM_CHECK_PROMPT.replace("{TEXT}", text);
+
+    try {
+      const res = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,  // 低めで安定した結果を得る
+          max_tokens: 1024,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Medical term check failed:", res.status);
+        return null;
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || "";
+
+      // JSONを抽出（```json ... ``` でラップされている場合も対応）
+      let jsonStr = content;
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      }
+
+      // JSONの開始位置を探す
+      const jsonStart = jsonStr.indexOf("{");
+      const jsonEnd = jsonStr.lastIndexOf("}");
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        jsonStr = jsonStr.slice(jsonStart, jsonEnd + 1);
+      }
+
+      const result = JSON.parse(jsonStr);
+      return result;
+    } catch (e) {
+      console.error("Medical term check error:", e);
+      return null;
+    }
+  }
+
+  /**
+   * 医学用語チェックモーダルを表示
+   * @param {string} originalText - 元のテキスト
+   * @param {{hasIssues: boolean, issues: Array<{original: string, suggested: string, reason: string}>, correctedText: string}} checkResult - チェック結果
+   * @returns {Promise<{action: "apply"|"asis"|"cancel", text: string}>}
+   */
+  function showTermCheckModal(originalText, checkResult) {
+    return new Promise((resolve) => {
+      // コンテンツを構築
+      let contentHtml = "";
+      if (checkResult.issues && checkResult.issues.length > 0) {
+        contentHtml = "<ul style='margin:0;padding-left:20px'>";
+        for (const issue of checkResult.issues) {
+          contentHtml += `<li style="margin-bottom:8px">
+            <strong style="color:#dc3545">${issue.original}</strong> →
+            <strong style="color:#28a745">${issue.suggested}</strong>
+            ${issue.reason ? `<br><small style="color:#666">${issue.reason}</small>` : ""}
+          </li>`;
+        }
+        contentHtml += "</ul>";
+      } else {
+        contentHtml = "<p style='color:#28a745;margin:0'>✅ 医学用語に問題は見つかりませんでした。</p>";
+      }
+
+      el.termCheckContent.innerHTML = contentHtml;
+
+      // 修正後テキストを表示（問題がある場合のみ）
+      if (checkResult.hasIssues && checkResult.correctedText && checkResult.correctedText !== originalText) {
+        el.termCheckCorrectedText.textContent = checkResult.correctedText;
+        el.termCheckCorrected.style.display = "block";
+        el.termCheckApply.style.display = "inline-block";
+      } else {
+        el.termCheckCorrected.style.display = "none";
+        el.termCheckApply.style.display = "none";
+      }
+
+      // モーダル表示
+      el.termCheckModal.style.display = "flex";
+
+      // ボタンハンドラー
+      const cleanup = () => {
+        el.termCheckModal.style.display = "none";
+        el.termCheckCancel.onclick = null;
+        el.termCheckAsIs.onclick = null;
+        el.termCheckApply.onclick = null;
+      };
+
+      el.termCheckCancel.onclick = () => {
+        cleanup();
+        resolve({ action: "cancel", text: originalText });
+      };
+
+      el.termCheckAsIs.onclick = () => {
+        cleanup();
+        resolve({ action: "asis", text: originalText });
+      };
+
+      el.termCheckApply.onclick = () => {
+        cleanup();
+        resolve({ action: "apply", text: checkResult.correctedText || originalText });
+      };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -2913,6 +3111,17 @@ ${APP_MANUAL_CONTENT}
         save();
         if (el.showLogprobsToggle.checked) {
           notify("📊 信頼度・代替候補表示を有効化しました（LM Studio v0.3.39以降が必要）");
+        }
+      };
+    }
+
+    // v1.7.2: 医学用語チェック設定
+    if (el.medicalTermCheckToggle) {
+      el.medicalTermCheckToggle.onchange = () => {
+        settings.medicalTermCheck = el.medicalTermCheckToggle.checked;
+        save();
+        if (el.medicalTermCheckToggle.checked) {
+          notify("🏥 医学用語チェックを有効化しました");
         }
       };
     }

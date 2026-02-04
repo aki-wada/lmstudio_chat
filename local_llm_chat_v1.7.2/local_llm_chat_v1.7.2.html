@@ -2,9 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>Local LLM Chat v1.7.1</title>
+<title>Local LLM Chat v1.7.2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="./assets/app.css?v=1.7.1" />
+<link rel="stylesheet" href="./assets/app.css?v=1.7.2" />
 <script src="./assets/marked.min.js"></script>
 <script src="./assets/pdf.min.js"></script>
 <script>
@@ -60,6 +60,12 @@
       📊 信頼度・代替候補を表示 (Open Responses API)
     </label>
     <span class="note">※ LM Studio v0.3.39以降が必要</span>
+  </div>
+  <div class="settings-row">
+    <label>
+      <input type="checkbox" id="medicalTermCheckToggle" />
+      🏥 医学用語チェック（送信前に不正確な医学用語をチェック）
+    </label>
   </div>
   <div class="settings-row">
     <label>🔗 Base URL:</label>
@@ -198,8 +204,25 @@
   </div>
 </div>
 
-<div id="version-badge" style="position:fixed;bottom:8px;right:12px;font-size:0.75em;color:#999;pointer-events:none;z-index:1">v1.7.1</div>
+<!-- 医学用語チェックダイアログ -->
+<div id="termCheckModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 16px;color:#333">🏥 医学用語チェック結果</h3>
+    <div id="termCheckContent" style="background:#f8f9fa;padding:16px;border-radius:8px;margin-bottom:16px;line-height:1.6"></div>
+    <div id="termCheckCorrected" style="display:none;background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid #4caf50">
+      <strong>修正後:</strong>
+      <div id="termCheckCorrectedText" style="margin-top:8px;white-space:pre-wrap"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button id="termCheckCancel" style="padding:8px 16px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer">キャンセル</button>
+      <button id="termCheckAsIs" style="padding:8px 16px;border:none;background:#6c757d;color:#fff;border-radius:6px;cursor:pointer">そのまま送信</button>
+      <button id="termCheckApply" style="display:none;padding:8px 16px;border:none;background:#28a745;color:#fff;border-radius:6px;cursor:pointer">修正して送信</button>
+    </div>
+  </div>
+</div>
 
-<script src="./js/app.js?v=1.7.1"></script>
+<div id="version-badge" style="position:fixed;bottom:8px;right:12px;font-size:0.75em;color:#999;pointer-events:none;z-index:1">v1.7.2</div>
+
+<script src="./js/app.js?v=1.7.2"></script>
 </body>
 </html>

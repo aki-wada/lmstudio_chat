@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Local LLM Chat v1.7.0 マニュアル</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    line-height: 1.8;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    color: #333;
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 24px;
+    border-bottom: 3px solid #007bff;
+    padding-bottom: 10px;
+    margin-bottom: 30px;
+  }
+
+  h2 {
+    font-size: 18px;
+    color: #007bff;
+    border-left: 4px solid #007bff;
+    padding-left: 12px;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 15px;
+    color: #333;
+    margin-top: 25px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 10px 0;
+  }
+
+  ul, ol {
+    margin: 10px 0;
+    padding-left: 25px;
+  }
+
+  li {
+    margin: 5px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 13px;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: bold;
+  }
+
+  code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 30px 0;
+  }
+
+  strong {
+    color: #222;
+  }
+
+  .new-feature {
+    background: #e7f5ff;
+    border: 1px solid #74c0fc;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+  }
+
+  .new-feature h3 {
+    color: #1971c2;
+    margin-top: 0;
+  }
+
+  .disclaimer {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+  }
+
+  .disclaimer h2 {
+    color: #856404;
+    border-left-color: #ffc107;
+  }
+
+  @media print {
+    body {
+      padding: 20px;
+      font-size: 12px;
+    }
+
+    h1 {
+      font-size: 20px;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-top: 25px;
+    }
+
+    h3 {
+      font-size: 14px;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Local LLM Chat v1.7.0 マニュアル</h1>
+
+<p><strong>2026 JRC ハンズオンセミナー 配布資料</strong></p>
+<p><strong>作成責任者</strong>: 和田昭彦</p>
+
+<hr>
+
+<h2>概要</h2>
+<p>Local LLM Chatは、ローカルで動作するLLMサーバー（LM Studio、Ollamaなど）と連携するWebベースのチャットインターフェースです。完全オフラインで動作し、プライバシーを重視した設計になっています。</p>
+
+<div class="new-feature">
+<h3>v1.7.0 新機能</h3>
+<ul>
+  <li>📊 <strong>モデル比較機能</strong>: 2つのモデルの回答を並べて比較表示（目玉機能）</li>
+  <li><strong>モデルリスト自動更新</strong>: ドロップダウンクリック時に自動更新（Refreshボタン廃止）</li>
+  <li><strong>ヘッダーUI改善</strong>: ボタンを機能グループごとに整理</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>動作要件</h2>
+<ul>
+  <li><strong>ブラウザ</strong>: Chrome、Firefox、Safari、Edge（モダンブラウザ）</li>
+  <li><strong>LLMサーバー</strong>: LM Studio（v0.4.0以降推奨）または Ollama</li>
+  <li><strong>デフォルトURL</strong>: <code>http://localhost:1234/v1</code></li>
+</ul>
+<p><strong>v1.7.0の一部機能は LM Studio v0.4.0以降が必要です:</strong></p>
+<ul>
+  <li>モデル比較機能（複数モデルの同時ロード）</li>
+</ul>
+
+<hr>
+
+<h2>LM Studio バージョン別の違い（0.3.x → 0.4.x）</h2>
+
+<div class="new-feature">
+<p><strong>ハンズオンセミナー参加者へ</strong>: 公式サイトからダウンロードすると <strong>v0.4.1</strong> がインストールされます。このセクションは参考情報です。<strong>ハンズオンでは v0.4.1 のみを使用</strong>します。</p>
+</div>
+
+<p>LM Studio 0.4.x は 0.3.x から大幅にアーキテクチャが刷新されました。以下に主な変更点をまとめます。</p>
+
+<h3>1. アーキテクチャ：GUI依存から「コア分離」へ</h3>
+<p><strong>llmster（daemon / headless deployment）</strong></p>
+<ul>
+  <li>LM Studioのコアが <strong>GUIから切り離されてデーモンとして動作</strong>する設計に再構築</li>
+  <li><strong>サーバー/CI/クラウド等の非GUI環境</strong>でも同じ基盤を使用可能</li>
+  <li>研究室内の閉域サーバーで「GUIなし常駐」が可能に</li>
+</ul>
+
+<h3>2. 推論性能：並列処理と連続バッチ</h3>
+<p><strong>Parallel requests + Continuous batching</strong></p>
+<ul>
+  <li>0.3系の「キューに並べて順番待ち」から、<strong>同一モデルに対して複数リクエストを同時処理</strong>する設計へ</li>
+  <li><code>n_parallel</code>（並列スロット）を使ったチューニングが中心に</li>
+  <li>CLIでも <code>lms load --parallel &lt;N&gt;</code> が追加され、運用の自動化がしやすく</li>
+  <li><strong>複数ユーザー・複数ワークフローが同時アクセスする構成で体感差が大きい</strong></li>
+</ul>
+
+<h3>3. API：ネイティブREST APIの正式リリース</h3>
+<p><strong>LM Studio native v1 REST API（<code>/api/v1/*</code>）</strong></p>
+<p>0.4.0で <strong>ネイティブv1 REST API</strong> が「公式リリース」として明記されました：</p>
+<table>
+  <tr><th>エンドポイント</th><th>機能</th></tr>
+  <tr><td><code>/api/v1/models</code></td><td>全ダウンロード済みモデル取得（state付き）</td></tr>
+  <tr><td><code>/api/v1/models/load</code></td><td>モデルロード</td></tr>
+  <tr><td>Stateful chats</td><td>ステートフル対話</td></tr>
+  <tr><td>Authentication</td><td>APIトークン設定</td></tr>
+  <tr><td>MCP via API</td><td>ローカルMCPをAPI経由で扱う</td></tr>
+</table>
+<p>0.3系は「OpenAI互換API」でつなぐ用途が中心でしたが、0.4以降は <strong>「LM Studioを運用するための管理API」</strong> が強化されています。</p>
+
+<h3>4. 互換性：Anthropic互換エンドポイント追加（0.4.1）</h3>
+<p><strong>Anthropic-compatible endpoint</strong></p>
+<ul>
+  <li>0.4.1で <strong>Anthropic互換（Claude系）</strong> の <code>POST /v1/messages</code> が追加</li>
+  <li>「OpenAI互換」だけでなく、<strong>複数プロトコル互換</strong>に拡張する方向</li>
+</ul>
+
+<h3>5. UI/UX：Developer Mode・Split View</h3>
+<ul>
+  <li>0.4.0で <strong>UIを刷新</strong>し、Split View（チャット2画面）や Developer Mode などが追加</li>
+  <li>モデルロード時に<strong>自動的にAPIサーバーが有効</strong>になる（0.3.xでは手動でサーバー起動が必要だった）</li>
+</ul>
+
+<h3>6. 安定性：0.4.1での修正</h3>
+<p>0.4.1は「0.4.0の初期不具合修正」が中心：</p>
+<ul>
+  <li>Macでのモデルロード関連のバグ修正（bf16系）</li>
+  <li><code>lms chat</code> の非ASCII（日本語など）問題修正</li>
+  <li>UIクラッシュやトークンカウントの誤報などの修正</li>
+</ul>
+
+<h3>バージョン比較まとめ</h3>
+<table>
+  <tr><th>機能</th><th>0.3.x</th><th>0.4.x</th></tr>
+  <tr><td>サーバー起動</td><td>手動（開発者タブ）</td><td><strong>モデルロード時に自動</strong></td></tr>
+  <tr><td>並列リクエスト</td><td>順番待ち</td><td><strong>同時処理対応</strong></td></tr>
+  <tr><td>複数モデル同時ロード</td><td>非対応</td><td><strong>対応</strong></td></tr>
+  <tr><td>ネイティブREST API</td><td>非公式</td><td><strong>正式リリース</strong></td></tr>
+  <tr><td>Anthropic互換API</td><td>なし</td><td><strong>0.4.1で追加</strong></td></tr>
+  <tr><td>headless運用</td><td>困難</td><td><strong>llmsterで対応</strong></td></tr>
+  <tr><td>CORS設定場所</td><td>開発者タブ</td><td><strong>設定 → Local Server</strong></td></tr>
+</table>
+<p><strong>推奨</strong>: Local LLM Chat v1.7.0 の全機能を使用するには <strong>LM Studio v0.4.0以降</strong> を使用してください。</p>
+
+<hr>
+
+<h2>事前準備：LM Studioでモデルをダウンロードする</h2>
+<p>Local LLM Chatを使用する前に、LM Studioでモデルをダウンロードしておく必要があります。</p>
+<p><strong>重要</strong>: Local LLM Chatアプリ自体にはモデルのダウンロード機能はありません。モデルの追加・管理はすべてLM Studio側で行います。</p>
+
+<h3>モデルのダウンロード手順</h3>
+<ol>
+  <li><strong>LM Studioを起動</strong></li>
+  <li><strong>左側メニューから「探索」を開く</strong>（⌘⇧M）
+    <ul>
+      <li>「Mission Control」ウィンドウが開きます</li>
+    </ul>
+  </li>
+  <li><strong>モデルを検索</strong>
+    <ul>
+      <li>上部の検索バー（「Hugging Faceでモデルを検索...」）にモデル名を入力</li>
+      <li>例: <code>qwen</code>, <code>llama</code>, <code>gemma</code>, <code>glm</code> など</li>
+      <li>「Staff picks」タブでおすすめモデルも確認できます</li>
+    </ul>
+  </li>
+  <li><strong>フォーマットを選択</strong>（検索バー右側のチェックボックス）
+    <ul>
+      <li><strong>GGUF</strong>: CPU/GPU汎用フォーマット（推奨）</li>
+      <li><strong>MLX</strong>: Apple Silicon (M1/M2/M3/M4) 最適化フォーマット</li>
+      <li>Windowsは GGUF を選択してください</li>
+    </ul>
+  </li>
+  <li><strong>ダウンロードしたいモデルをリストから選択</strong>
+    <ul>
+      <li>右側にモデルの詳細情報が表示されます（パラメータ数、アーキテクチャなど）</li>
+      <li>「Download Options」で量子化レベル（4BIT等）とファイルサイズを確認</li>
+    </ul>
+  </li>
+  <li><strong>右下の「ダウンロード」ボタンをクリック</strong>
+    <ul>
+      <li>ダウンロード完了を待ちます</li>
+      <li>モデルサイズによっては数分〜数十分かかります</li>
+    </ul>
+  </li>
+</ol>
+
+<h3>モデル選択のポイント</h3>
+<table>
+  <tr>
+    <th>用途</th>
+    <th>推奨モデルサイズ</th>
+    <th>備考</th>
+  </tr>
+  <tr>
+    <td>一般的な会話・質問応答</td>
+    <td>7B〜14B</td>
+    <td>バランスが良い</td>
+  </tr>
+  <tr>
+    <td>高度な推論・コード生成</td>
+    <td>30B以上</td>
+    <td>高性能だがメモリ消費大</td>
+  </tr>
+  <tr>
+    <td>画像認識（Vision）</td>
+    <td>30B以上推奨</td>
+    <td>👁️マーク付きモデルを選択</td>
+  </tr>
+  <tr>
+    <td>軽量・高速応答</td>
+    <td>3B〜7B</td>
+    <td>メモリが少ない環境向け</td>
+  </tr>
+</table>
+
+<h3>量子化レベルについて</h3>
+<p>モデル名に含まれる <code>Q4_K_M</code>, <code>Q8_0</code> などは量子化レベルを示します：</p>
+<ul>
+  <li><strong>Q8</strong>: 高品質、メモリ消費大</li>
+  <li><strong>Q6_K</strong>: 品質とサイズのバランス良好</li>
+  <li><strong>Q4_K_M</strong>: 一般的な選択、品質と効率のバランス</li>
+  <li><strong>Q4_K_S</strong>: より軽量、やや品質低下</li>
+  <li><strong>Q3_K</strong>: 軽量だが品質低下あり</li>
+</ul>
+<p>迷った場合は <strong>Q4_K_M</strong> を選ぶのがおすすめです。</p>
+
+<hr>
+
+<h2>起動方法（v0.4.1前提）</h2>
+
+<div class="new-feature">
+<p><strong>ポイント</strong>: LM Studio 0.4.1 では「モデルをロード＝使える」状態になります。サーバー設定などは<strong>触る必要がありません</strong>。</p>
+</div>
+
+<h3>3ステップで開始</h3>
+<ol>
+  <li><strong>LM Studioを起動し、モデルをロード</strong>
+    <ul>
+      <li>画面上部の「読み込むモデルを選択」からモデルを選択</li>
+      <li>ロードが完了すると、<strong>自動的にAPIが有効</strong>になります（<code>http://localhost:1234</code>）</li>
+    </ul>
+  </li>
+  <li><strong><code>local_llm_chat_v1.7.0.html</code> をブラウザで開く</strong></li>
+  <li><strong>モデルが自動的にドロップダウンに表示される</strong> → 会話開始！</li>
+</ol>
+
+<h3>疎通確認（うまくいかない場合）</h3>
+<p>ターミナルで以下を実行：</p>
+<p><code>curl http://localhost:1234/v1/models</code></p>
+<ul>
+  <li><strong>返答あり</strong> → OK、接続できています</li>
+  <li><strong>返答なし</strong> → LM Studioでモデルがロードされていない可能性</li>
+</ul>
+
+<h3>注意事項（CORS設定）</h3>
+<p>ブラウザから接続できない場合は、LM Studio設定で「<strong>CORSを有効にする</strong>」をONにしてください：</p>
+<p>設定（⚙️）→ 「Local Server」セクション → 「Enable CORS」をON</p>
+
+<hr>
+
+<h2>画面構成</h2>
+
+<h3>ヘッダー</h3>
+<ul>
+  <li><strong>タイトル</strong>: Local LLM Chat v1.7.0</li>
+  <li><strong>モデル選択</strong>: ロードされているモデルを選択（👁️マークはVision対応）- クリック時に自動更新</li>
+  <li><strong>📊 比較</strong>: モデル比較モードのON/OFF（v1.7.0新機能）</li>
+  <li><strong>比較モデル選択</strong>: 比較モードON時のみ表示、2つ目のモデルを選択</li>
+  <li><strong>🆕 新しい話題</strong>: 新しい話題を開始（AIへの履歴送信をリセット、画面は保持）</li>
+  <li><strong>🗑️</strong>: 会話履歴をクリア</li>
+  <li><strong>💾</strong>: 会話履歴をJSONでエクスポート</li>
+  <li><strong>📥</strong>: 会話履歴をJSONからインポート</li>
+  <li><strong>❓</strong>: ヘルプモードのON/OFF</li>
+  <li><strong>⚙️</strong>: 設定パネルを開く</li>
+</ul>
+
+<h3>入力エリア（画面下部）</h3>
+<ul>
+  <li><strong>📷 Image</strong>: 画像ファイルを添付（複数可）</li>
+  <li><strong>📎 File</strong>: テキスト/PDFファイルを添付（複数可）</li>
+  <li><strong>🔍 深掘り</strong>: 深掘りモードのON/OFF</li>
+  <li><strong>テキスト入力欄</strong>: メッセージを入力</li>
+  <li><strong>🚀 Send</strong>: メッセージを送信</li>
+  <li><strong>⏹ Stop</strong>: 生成を中断</li>
+  <li><strong>📋 Preset</strong>: プリセットプロンプトを挿入</li>
+</ul>
+
+<hr>
+
+<h2>主な機能</h2>
+
+<div class="new-feature">
+<h3>1. モデル比較機能（v1.7.0新機能）</h3>
+<p>📊 比較ボタンで2つのモデルの回答を並べて比較できます。</p>
+<p><strong>使い方:</strong></p>
+<ol>
+  <li>📊 比較ボタンをクリックして比較モードをONにする</li>
+  <li>メインモデル（左側）と比較モデル（右側）を選択</li>
+  <li>質問を入力して送信</li>
+  <li>2つのモデルの回答がサイドバイサイドでリアルタイム表示される</li>
+</ol>
+<p><strong>特徴:</strong></p>
+<ul>
+  <li>同じ質問を2つのモデルに同時に送信</li>
+  <li>並列ストリーミングで両方の回答をリアルタイム表示</li>
+  <li>モバイル対応（768px以下で縦並び表示）</li>
+</ul>
+<p><strong>要件:</strong> LM Studio v0.4.0以降（複数モデルの同時ロードが必要）</p>
+</div>
+
+<h3>2. チャット機能</h3>
+<ul>
+  <li><strong>ストリーミング応答</strong>: リアルタイムでAIの回答を表示</li>
+  <li><strong>Markdown対応</strong>: コードブロック、リスト、表などを整形表示</li>
+  <li><strong>メッセージ操作</strong>:
+    <ul>
+      <li>📋 Copy: メッセージをコピー</li>
+      <li>🗑 Delete: メッセージを削除</li>
+      <li>✏️ Edit: ユーザーメッセージを編集・再送信</li>
+      <li>🔄 Regenerate: AI応答を再生成</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>3. 画像・ファイル添付</h3>
+<ul>
+  <li><strong>画像添付</strong>: Vision対応モデルで画像を認識
+    <ul>
+      <li>📷 Imageボタン、ペースト（Ctrl+V）、ドラッグ＆ドロップ対応</li>
+      <li>複数画像の同時添付可能</li>
+      <li><strong>サイズ制限: 20MB以下</strong></li>
+    </ul>
+  </li>
+  <li><strong>ファイル添付</strong>: テキストファイルやPDFの内容を送信
+    <ul>
+      <li>対応形式: .txt, .md, .json, .csv, .xml, .html, .css, .js, .py, .pdf など</li>
+      <li><strong>サイズ制限: テキスト2MB以下、PDF10MB以下</strong></li>
+    </ul>
+  </li>
+</ul>
+
+<h3>4. 深掘りモード</h3>
+<p>🔍深掘りボタンで有効化すると、より深く分析した回答を促します。</p>
+
+<h3>5. 新しい話題</h3>
+<p>🆕 新しい話題ボタンをクリックすると、AIへの会話履歴送信がリセットされます。画面上の会話は保持され、区切り線が表示されます。</p>
+
+<h3>6. ヘルプモード</h3>
+<p>❓ ボタンで有効化すると、このアプリの使い方をLLMに質問できます。</p>
+
+<h3>7. プリセットプロンプト</h3>
+<p>📋 Presetボタンで定型プロンプトを挿入：🏥 疾患解説、💊 鑑別診断、📄 文章要約、📝 論文査読、📈 統計解析、✉️ 英文メール作成</p>
+
+<hr>
+
+<h2>設定項目</h2>
+
+<h3>基本設定</h3>
+<table>
+  <tr>
+    <th>項目</th>
+    <th>説明</th>
+    <th>デフォルト</th>
+  </tr>
+  <tr>
+    <td>🌙 Dark Mode</td>
+    <td>ダークモードの切替</td>
+    <td>OFF</td>
+  </tr>
+  <tr>
+    <td>🔗 Base URL</td>
+    <td>LLMサーバーのURL</td>
+    <td>http://localhost:1234/v1</td>
+  </tr>
+  <tr>
+    <td>🔑 API Key</td>
+    <td>認証キー</td>
+    <td>lmstudio</td>
+  </tr>
+  <tr>
+    <td>Temperature</td>
+    <td>創造性（0=安定、2=創造的）</td>
+    <td>0.7</td>
+  </tr>
+  <tr>
+    <td>Max Tokens</td>
+    <td>最大出力トークン数</td>
+    <td>2048</td>
+  </tr>
+  <tr>
+    <td>送信キー</td>
+    <td>メッセージ送信のキー設定</td>
+    <td>Enter で送信</td>
+  </tr>
+</table>
+
+<h3>応答スタイル</h3>
+<table>
+  <tr>
+    <th>スタイル</th>
+    <th>説明</th>
+  </tr>
+  <tr>
+    <td>簡潔</td>
+    <td>要点のみを短く</td>
+  </tr>
+  <tr>
+    <td>標準</td>
+    <td>バランスの取れた回答</td>
+  </tr>
+  <tr>
+    <td>詳細</td>
+    <td>背景や具体例を含む</td>
+  </tr>
+  <tr>
+    <td>専門的</td>
+    <td>技術的詳細重視</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2>キーボードショートカット</h2>
+<table>
+  <tr>
+    <th>ショートカット</th>
+    <th>動作</th>
+  </tr>
+  <tr>
+    <td>Enter</td>
+    <td>メッセージ送信（設定による）</td>
+  </tr>
+  <tr>
+    <td>Ctrl/Cmd + Enter</td>
+    <td>メッセージ送信（設定による）</td>
+  </tr>
+  <tr>
+    <td>Shift + Enter</td>
+    <td>改行</td>
+  </tr>
+  <tr>
+    <td>Ctrl/Cmd + V</td>
+    <td>画像をペースト</td>
+  </tr>
+  <tr>
+    <td>Ctrl/Cmd + K</td>
+    <td>履歴クリア</td>
+  </tr>
+  <tr>
+    <td>Esc</td>
+    <td>設定パネル/プリセットパネルを閉じる</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2>トラブルシューティング</h2>
+
+<h3>まず確認：curlで疎通テスト</h3>
+<p>問題が発生したら、まずターミナルで以下を実行：</p>
+<p><code>curl http://localhost:1234/v1/models</code></p>
+<ul>
+  <li><strong>返答あり</strong> → LM Studioは正常。ブラウザ側（CORS等）の問題</li>
+  <li><strong>返答なし</strong> → LM Studioでモデルがロードされていない</li>
+</ul>
+
+<h3>モデルが表示されない</h3>
+<ol>
+  <li><strong>モデルがロードされているか確認</strong>（LM Studio画面上部でモデル名が表示されているか）</li>
+  <li>上記curlコマンドで疎通確認</li>
+  <li>CORSが有効か確認（設定 → Local Server → 「CORSを有効にする」がON）</li>
+  <li>モデル選択ドロップダウンをクリックして更新</li>
+</ol>
+
+<h3>比較機能が動作しない</h3>
+<ol>
+  <li><strong>2つのモデルがLM Studioでロードされているか確認</strong></li>
+  <li>比較モード（📊ボタン）がONになっているか確認</li>
+</ol>
+
+<h3>画像が認識されない</h3>
+<ol>
+  <li>Vision対応モデル（👁️マーク付き）を選択しているか確認</li>
+  <li>画像サイズが20MB以下か確認</li>
+  <li>モデルサイズは30B以上を推奨</li>
+</ol>
+
+<h3>応答が遅い・途切れる</h3>
+<ol>
+  <li>Max Tokensを減らす</li>
+  <li>より小さいモデルに変更</li>
+  <li>PCのメモリ・GPU使用状況を確認</li>
+</ol>
+
+<hr>
+
+<h2>データ保存について</h2>
+<p>すべてのデータはブラウザのlocalStorageに保存されます。データはブラウザを閉じても保持されます。プライベートモード/シークレットモードでは保存されません。</p>
+
+<hr>
+
+<h2>技術情報</h2>
+<ul>
+  <li><strong>対応API</strong>: OpenAI互換API（LM Studio、Ollama、LocalAI など）</li>
+  <li><strong>外部ライブラリ</strong>: marked.js（Markdown）、PDF.js（PDF抽出）</li>
+  <li><strong>オフライン対応</strong>: すべてのライブラリはローカルに同梱</li>
+</ul>
+
+<hr>
+
+<div class="disclaimer">
+<h2>免責事項</h2>
+<p>本ソフトウェア（Local LLM Chat）は「現状有姿」で提供されます。作成者は、本ソフトウェアの使用または使用不能から生じるいかなる損害についても、一切の責任を負いません。</p>
+<p>本ソフトウェアを使用することにより、ユーザーは以下の事項に同意したものとみなされます：</p>
+<ol>
+  <li><strong>自己責任での使用</strong>: 本ソフトウェアの使用は、すべてユーザー自身の責任において行われます。</li>
+  <li><strong>無保証</strong>: 作成者は、本ソフトウェアの正確性、信頼性、完全性、有用性について、いかなる保証も行いません。</li>
+  <li><strong>AI出力の検証</strong>: AIによる出力結果は参考情報であり、重要な判断を行う前には必ず専門家への相談や独自の検証を行ってください。</li>
+  <li><strong>医療・法律・財務への非適用</strong>: 本ソフトウェアは医療診断、法的助言、財務アドバイスを提供するものではありません。これらの分野での判断には、必ず資格を持つ専門家にご相談ください。</li>
+</ol>
+<p>本ソフトウェアを使用した時点で、上記の免責事項に同意したものとみなされます。</p>
+</div>
+
+<hr>
+
+<h2>謝辞</h2>
+<p>テスト運用とフィードバックにご協力いただいた皆様に感謝いたします。</p>
+<ul>
+  <li>入江隆介先生</li>
+  <li>守田裕一先生</li>
+  <li>笹山大樹先生</li>
+</ul>
+
+</body>
+</html>
