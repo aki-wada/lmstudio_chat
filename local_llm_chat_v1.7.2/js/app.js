@@ -186,7 +186,6 @@
     userInterests: "",
     darkMode: false,
     showLogprobs: false,  // v1.6.7: 信頼度・代替候補表示
-    medicalTermCheck: false,  // v1.7.2: 医学用語チェック
   });
 
   // ---------------------------------------------------------------------------
@@ -223,7 +222,6 @@
     userInterests: document.getElementById("userInterests"),
     darkModeToggle: document.getElementById("darkModeToggle"),
     showLogprobsToggle: document.getElementById("showLogprobsToggle"),  // v1.6.7
-    medicalTermCheckToggle: document.getElementById("medicalTermCheckToggle"),  // v1.7.2
 
     // v1.7.2: 医学用語チェックモーダル
     termCheckModal: document.getElementById("termCheckModal"),
@@ -689,11 +687,6 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
     if (el.showLogprobsToggle) {
       el.showLogprobsToggle.checked = Boolean(settings.showLogprobs);
     }
-
-    // v1.7.2: 医学用語チェック設定
-    if (el.medicalTermCheckToggle) {
-      el.medicalTermCheckToggle.checked = Boolean(settings.medicalTermCheck);
-    }
   }
 
   /** UI → settingsへ反映し保存 */
@@ -712,7 +705,6 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       userInterests: el.userInterests.value.trim(),
       darkMode: document.body.classList.contains("dark-mode"),
       showLogprobs: el.showLogprobsToggle?.checked || false,  // v1.6.7
-      medicalTermCheck: el.medicalTermCheckToggle?.checked || false,  // v1.7.2
     };
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }
@@ -923,6 +915,21 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       regenBtn.textContent = "🔄 Regenerate";
       regenBtn.onclick = () => regenerateLastAssistant(msgDiv);
       actions.appendChild(regenBtn);
+
+      // 医学用語チェックボタン（v1.7.2）
+      const termCheckBtn = document.createElement("button");
+      termCheckBtn.classList.add("msg-btn");
+      termCheckBtn.textContent = "🏥 Check";
+      termCheckBtn.title = "医学用語をチェック";
+      termCheckBtn.onclick = () => {
+        const content = msgDiv.dataset.content || "";
+        if (!content.trim()) {
+          notify("⚠️ チェックする内容がありません");
+          return;
+        }
+        performPostResponseTermCheck(content);
+      };
+      actions.appendChild(termCheckBtn);
     }
 
     return actions;
@@ -2070,9 +2077,6 @@ ${APP_MANUAL_CONTENT}
         el.sendBtn.disabled = false;             // ★ 追加: 送信ボタンを再有効化
         runtime.controller = null;
 
-        // v1.7.2: AI応答の医学用語を自己チェック
-        performPostResponseTermCheck(content);
-
       } else {
         // 通常のストリーミングAPI（/v1/chat/completions）
         const requestBody = {
@@ -2130,9 +2134,6 @@ ${APP_MANUAL_CONTENT}
             el.stopBtn.disabled = true;
             el.stopBtn.setAttribute("disabled", ""); // ★ 確実にdisabledを設定
             runtime.controller = null;
-
-            // v1.7.2: AI応答の医学用語を自己チェック
-            performPostResponseTermCheck(content);
           }
         );
       }
@@ -2307,15 +2308,15 @@ AI応答テキスト:
   }
 
   /**
-   * AI応答の医学用語を自己チェック（応答完了後に呼び出し）
+   * AI応答の医学用語をチェック（Checkボタンから呼び出し）
    * @param {string} responseText - AI応答テキスト
    */
   async function performPostResponseTermCheck(responseText) {
-    if (!settings.medicalTermCheck || !responseText || responseText.length === 0) {
+    if (!responseText || responseText.length === 0) {
       return;
     }
 
-    notify("🏥 AI応答の医学用語をチェック中...");
+    notify("🏥 医学用語をチェック中...");
 
     try {
       const checkResult = await checkMedicalTerminology(responseText);
@@ -3097,17 +3098,6 @@ AI応答テキスト:
         save();
         if (el.showLogprobsToggle.checked) {
           notify("📊 信頼度・代替候補表示を有効化しました（LM Studio v0.3.39以降が必要）");
-        }
-      };
-    }
-
-    // v1.7.2: 医学用語チェック設定
-    if (el.medicalTermCheckToggle) {
-      el.medicalTermCheckToggle.onchange = () => {
-        settings.medicalTermCheck = el.medicalTermCheckToggle.checked;
-        save();
-        if (el.medicalTermCheckToggle.checked) {
-          notify("🏥 医学用語チェックを有効化しました");
         }
       };
     }
