@@ -62,6 +62,12 @@
     <span class="note">※ LM Studio v0.3.39以降が必要</span>
   </div>
   <div class="settings-row">
+    <label>
+      <input type="checkbox" id="medicalTermCheckToggle" />
+      🏥 医学用語チェック（送信前に不正確な医学用語をチェック）
+    </label>
+  </div>
+  <div class="settings-row">
     <label>🔗 Base URL:</label>
     <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:220px" />
     <span class="note">※ デフォルト: http://localhost:1234/v1</span>
@@ -195,6 +201,23 @@
     <button id="presetBtn" style="padding:0 12px;height:36px;font-size:0.95em;border:none;border-radius:8px;background:#17a2b8;color:#fff;cursor:pointer;text-align:center">
       📋 Preset
     </button>
+  </div>
+</div>
+
+<!-- 医学用語チェックダイアログ -->
+<div id="termCheckModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 16px;color:#333">🏥 医学用語チェック結果</h3>
+    <div id="termCheckContent" style="background:#f8f9fa;padding:16px;border-radius:8px;margin-bottom:16px;line-height:1.6"></div>
+    <div id="termCheckCorrected" style="display:none;background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid #4caf50">
+      <strong>修正後:</strong>
+      <div id="termCheckCorrectedText" style="margin-top:8px;white-space:pre-wrap"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button id="termCheckCancel" style="padding:8px 16px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer">キャンセル</button>
+      <button id="termCheckAsIs" style="padding:8px 16px;border:none;background:#6c757d;color:#fff;border-radius:6px;cursor:pointer">そのまま送信</button>
+      <button id="termCheckApply" style="display:none;padding:8px 16px;border:none;background:#28a745;color:#fff;border-radius:6px;cursor:pointer">修正して送信</button>
+    </div>
   </div>
 </div>
 
