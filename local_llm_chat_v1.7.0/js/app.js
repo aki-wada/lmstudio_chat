@@ -11,9 +11,11 @@
  *   - POST /api/v1/models/load  (LM Studio v1 API - モデルロード)
  *
  * 永続化（localStorage）:
- *   - chatHistory_v1.6   : 会話履歴（配列）
- *   - chatSettings_v1.6  : 設定（Base URL / Key / temperature 等）
- *   - chatPresets_v1.6   : プリセットのカスタム文面
+ *   - localLLMChat_history      : 会話履歴（配列）
+ *   - localLLMChat_settings     : 設定（Base URL / Key / temperature 等）
+ *   - localLLMChat_presets      : プリセットのカスタム文面
+ *   - localLLMChat_presetLabels : プリセットのラベル
+ *   - localLLMChat_draft        : 入力中の下書き
  *
  * v1.7.0 新機能 (2026-02-01):
  *   - 📊 モデル比較機能: 2つのモデルの回答を並べて比較表示
@@ -71,12 +73,55 @@
   // ---------------------------------------------------------------------------
 
   const STORAGE_KEYS = Object.freeze({
+    HISTORY: "localLLMChat_history",
+    SETTINGS: "localLLMChat_settings",
+    PRESETS: "localLLMChat_presets",
+    DRAFT: "localLLMChat_draft",
+    PRESET_LABELS: "localLLMChat_presetLabels",
+  });
+
+  // 旧バージョンのキー（マイグレーション用）
+  const LEGACY_STORAGE_KEYS = Object.freeze({
     HISTORY: "chatHistory_v1.6",
     SETTINGS: "chatSettings_v1.6",
     PRESETS: "chatPresets_v1.6",
     DRAFT: "chatDraft_v1.6",
     PRESET_LABELS: "chatPresetLabels_v1.6",
   });
+
+  /**
+   * 旧キーから新キーへデータをマイグレーション
+   * 旧キーにデータがあり、新キーにデータがない場合のみ移行
+   */
+  function migrateStorageKeys() {
+    const migrations = [
+      { oldKey: LEGACY_STORAGE_KEYS.HISTORY, newKey: STORAGE_KEYS.HISTORY },
+      { oldKey: LEGACY_STORAGE_KEYS.SETTINGS, newKey: STORAGE_KEYS.SETTINGS },
+      { oldKey: LEGACY_STORAGE_KEYS.PRESETS, newKey: STORAGE_KEYS.PRESETS },
+      { oldKey: LEGACY_STORAGE_KEYS.DRAFT, newKey: STORAGE_KEYS.DRAFT },
+      { oldKey: LEGACY_STORAGE_KEYS.PRESET_LABELS, newKey: STORAGE_KEYS.PRESET_LABELS },
+    ];
+
+    let migrated = false;
+    migrations.forEach(({ oldKey, newKey }) => {
+      const oldData = localStorage.getItem(oldKey);
+      const newData = localStorage.getItem(newKey);
+      // 旧データがあり、新データがない場合のみ移行
+      if (oldData && !newData) {
+        localStorage.setItem(newKey, oldData);
+        localStorage.removeItem(oldKey);
+        console.log(`[Migration] ${oldKey} → ${newKey}`);
+        migrated = true;
+      } else if (oldData && newData) {
+        // 両方ある場合は旧データを削除（新データを優先）
+        localStorage.removeItem(oldKey);
+        console.log(`[Migration] Removed legacy key: ${oldKey}`);
+      }
+    });
+    if (migrated) {
+      console.log("[Migration] データ移行が完了しました");
+    }
+  }
 
   const LIMITS = Object.freeze({
     IMAGE_MAX_BYTES: 20 * 1024 * 1024,  // 20MB
@@ -3145,6 +3190,9 @@ ${APP_MANUAL_CONTENT}
   }
 
   async function init() {
+    // 旧バージョンからのデータ移行
+    migrateStorageKeys();
+
     setupMarkdown();
 
     settings = loadSettings();
