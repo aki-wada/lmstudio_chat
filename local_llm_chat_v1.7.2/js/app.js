@@ -1847,29 +1847,6 @@ ${APP_MANUAL_CONTENT}
       return;
     }
 
-    // v1.7.2: 医学用語チェック（有効時、テキストがある場合のみ）
-    if (settings.medicalTermCheck && text && text.length > 0) {
-      notify("🏥 医学用語をチェック中...");
-      const checkResult = await checkMedicalTerminology(text);
-
-      if (checkResult) {
-        const modalResult = await showTermCheckModal(text, checkResult);
-
-        if (modalResult.action === "cancel") {
-          // 入力欄にテキストを戻す
-          el.prompt.value = text;
-          autoResizeTextarea(el.prompt);
-          return;
-        }
-
-        if (modalResult.action === "apply" && modalResult.text !== text) {
-          // 修正後のテキストを使用
-          text = modalResult.text;
-          notify("✅ 修正後のテキストで送信します");
-        }
-      }
-    }
-
     // v1.7.0: 比較モード時は専用の処理へ分岐
     if (compareMode) {
       const compareModel = el.compareModelSelect?.value;
@@ -2093,6 +2070,9 @@ ${APP_MANUAL_CONTENT}
         el.sendBtn.disabled = false;             // ★ 追加: 送信ボタンを再有効化
         runtime.controller = null;
 
+        // v1.7.2: AI応答の医学用語を自己チェック
+        performPostResponseTermCheck(content);
+
       } else {
         // 通常のストリーミングAPI（/v1/chat/completions）
         const requestBody = {
@@ -2150,6 +2130,9 @@ ${APP_MANUAL_CONTENT}
             el.stopBtn.disabled = true;
             el.stopBtn.setAttribute("disabled", ""); // ★ 確実にdisabledを設定
             runtime.controller = null;
+
+            // v1.7.2: AI応答の医学用語を自己チェック
+            performPostResponseTermCheck(content);
           }
         );
       }
@@ -2197,9 +2180,9 @@ ${APP_MANUAL_CONTENT}
   /**
    * 医学用語チェックのプロンプト
    */
-  const MEDICAL_TERM_CHECK_PROMPT = `あなたは医学用語の専門家です。以下のテキストに含まれる医学用語をチェックしてください。
+  const MEDICAL_TERM_CHECK_PROMPT = `あなたは医学用語の専門家です。以下のAI応答に含まれる医学用語をチェックし、誤りがあれば指摘してください。
 
-チェック対象テキスト:
+AI応答テキスト:
 """
 {TEXT}
 """
@@ -2209,16 +2192,16 @@ ${APP_MANUAL_CONTENT}
   "hasIssues": true/false,
   "issues": [
     {
-      "original": "誤った用語",
-      "suggested": "正しい用語",
+      "original": "誤った用語または表現",
+      "suggested": "正しい用語または表現",
       "reason": "理由"
     }
-  ],
-  "correctedText": "修正後のテキスト全文（問題がない場合は元のテキスト）"
+  ]
 }
 
 注意:
-- 明らかな誤りのみ指摘してください（略語、俗語は許容）
+- 明らかな誤りのみ指摘してください（略語、俗語、一般的な表現は許容）
+- 医学的に不正確な記述や誤解を招く表現を重点的にチェック
 - 問題がなければ hasIssues: false を返してください
 - 必ず有効なJSONのみを返してください`;
 
@@ -2282,67 +2265,70 @@ ${APP_MANUAL_CONTENT}
   }
 
   /**
-   * 医学用語チェックモーダルを表示
-   * @param {string} originalText - 元のテキスト
-   * @param {{hasIssues: boolean, issues: Array<{original: string, suggested: string, reason: string}>, correctedText: string}} checkResult - チェック結果
-   * @returns {Promise<{action: "apply"|"asis"|"cancel", text: string}>}
+   * 医学用語チェックモーダルを表示（応答後の自己チェック用）
+   * @param {{hasIssues: boolean, issues: Array<{original: string, suggested: string, reason: string}>}} checkResult - チェック結果
    */
-  function showTermCheckModal(originalText, checkResult) {
-    return new Promise((resolve) => {
-      // コンテンツを構築
-      let contentHtml = "";
-      if (checkResult.issues && checkResult.issues.length > 0) {
-        contentHtml = "<ul style='margin:0;padding-left:20px'>";
-        for (const issue of checkResult.issues) {
-          contentHtml += `<li style="margin-bottom:8px">
-            <strong style="color:#dc3545">${issue.original}</strong> →
-            <strong style="color:#28a745">${issue.suggested}</strong>
-            ${issue.reason ? `<br><small style="color:#666">${issue.reason}</small>` : ""}
-          </li>`;
-        }
-        contentHtml += "</ul>";
-      } else {
-        contentHtml = "<p style='color:#28a745;margin:0'>✅ 医学用語に問題は見つかりませんでした。</p>";
+  function showTermCheckModal(checkResult) {
+    // コンテンツを構築
+    let contentHtml = "";
+    if (checkResult.issues && checkResult.issues.length > 0) {
+      contentHtml = "<ul style='margin:0;padding-left:20px'>";
+      for (const issue of checkResult.issues) {
+        contentHtml += `<li style="margin-bottom:8px">
+          <strong style="color:#dc3545">${issue.original}</strong> →
+          <strong style="color:#28a745">${issue.suggested}</strong>
+          ${issue.reason ? `<br><small style="color:#666">${issue.reason}</small>` : ""}
+        </li>`;
       }
+      contentHtml += "</ul>";
+    } else {
+      contentHtml = "<p style='color:#28a745;margin:0'>✅ AI応答の医学用語に問題は見つかりませんでした。</p>";
+    }
 
-      el.termCheckContent.innerHTML = contentHtml;
+    el.termCheckContent.innerHTML = contentHtml;
 
-      // 修正後テキストを表示（問題がある場合のみ）
-      if (checkResult.hasIssues && checkResult.correctedText && checkResult.correctedText !== originalText) {
-        el.termCheckCorrectedText.textContent = checkResult.correctedText;
-        el.termCheckCorrected.style.display = "block";
-        el.termCheckApply.style.display = "inline-block";
+    // 修正テキスト欄は非表示（応答後チェックでは使用しない）
+    el.termCheckCorrected.style.display = "none";
+    el.termCheckApply.style.display = "none";
+
+    // モーダル表示
+    el.termCheckModal.style.display = "flex";
+
+    // ボタンハンドラー（閉じるボタンのみ有効）
+    const cleanup = () => {
+      el.termCheckModal.style.display = "none";
+      el.termCheckCancel.onclick = null;
+      el.termCheckAsIs.onclick = null;
+    };
+
+    // 両方のボタンを「閉じる」として機能させる
+    el.termCheckCancel.onclick = cleanup;
+    el.termCheckAsIs.onclick = cleanup;
+  }
+
+  /**
+   * AI応答の医学用語を自己チェック（応答完了後に呼び出し）
+   * @param {string} responseText - AI応答テキスト
+   */
+  async function performPostResponseTermCheck(responseText) {
+    if (!settings.medicalTermCheck || !responseText || responseText.length === 0) {
+      return;
+    }
+
+    notify("🏥 AI応答の医学用語をチェック中...");
+
+    try {
+      const checkResult = await checkMedicalTerminology(responseText);
+
+      if (checkResult && checkResult.hasIssues && checkResult.issues && checkResult.issues.length > 0) {
+        notify("⚠️ 医学用語に注意が必要な箇所があります");
+        showTermCheckModal(checkResult);
       } else {
-        el.termCheckCorrected.style.display = "none";
-        el.termCheckApply.style.display = "none";
+        notify("✅ 医学用語チェック完了（問題なし）");
       }
-
-      // モーダル表示
-      el.termCheckModal.style.display = "flex";
-
-      // ボタンハンドラー
-      const cleanup = () => {
-        el.termCheckModal.style.display = "none";
-        el.termCheckCancel.onclick = null;
-        el.termCheckAsIs.onclick = null;
-        el.termCheckApply.onclick = null;
-      };
-
-      el.termCheckCancel.onclick = () => {
-        cleanup();
-        resolve({ action: "cancel", text: originalText });
-      };
-
-      el.termCheckAsIs.onclick = () => {
-        cleanup();
-        resolve({ action: "asis", text: originalText });
-      };
-
-      el.termCheckApply.onclick = () => {
-        cleanup();
-        resolve({ action: "apply", text: checkResult.correctedText || originalText });
-      };
-    });
+    } catch (e) {
+      console.error("Post-response term check error:", e);
+    }
   }
 
   // ---------------------------------------------------------------------------
