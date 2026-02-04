@@ -23,7 +23,6 @@
     <select id="modelSelect" title="クリックでモデル一覧を更新">
       <!-- クリック時に自動更新 -->
     </select>
-    <button id="compareBtn" title="2つのモデルの回答を比較" style="border:2px solid #6f42c1;background:#fff;color:#6f42c1">📊 比較</button>
     <span id="compareRow" style="display:none">
       <span style="margin-left:16px">比較:</span>
       <select id="compareModelSelect" title="比較対象のモデルを選択">
@@ -40,6 +39,9 @@
     <button id="exportBtn" title="会話履歴を保存">💾</button>
     <button id="importBtn" title="会話履歴を読み込み">📥</button>
     <input type="file" id="importInput" accept=".json" style="display:none" />
+    <span style="border-left:1px solid rgba(255,255,255,0.3);height:24px;margin:0 4px"></span>
+    <!-- 比較モード -->
+    <button id="compareBtn" title="2つのモデルの回答を比較" style="border:2px solid #6f42c1;background:#fff;color:#6f42c1">📊 比較</button>
     <span style="border-left:1px solid rgba(255,255,255,0.3);height:24px;margin:0 4px"></span>
     <!-- システム -->
     <button id="helpBtn" title="ヘルプを表示" style="border:2px solid #fd7e14;background:#fff;color:#fd7e14">❓</button>
