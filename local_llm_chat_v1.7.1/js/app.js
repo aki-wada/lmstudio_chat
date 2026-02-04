@@ -1789,6 +1789,13 @@ ${APP_MANUAL_CONTENT}
       messages.push({ role: "assistant", content: resultA || "(比較モード)" });
       persistHistory();
 
+    } catch (e) {
+      // ★ 停止時もユーザーメッセージを履歴に保存（Edit対応）
+      if (e && e.name === "AbortError") {
+        messages.push(userMessageForHistory);
+        messages.push({ role: "assistant", content: contentA || "(比較モード - 停止)" });
+        persistHistory();
+      }
     } finally {
       isStreaming = false;
       userScrolledDuringStream = false;
@@ -2109,7 +2116,13 @@ ${APP_MANUAL_CONTENT}
       const currentContent = currentMsgDiv.dataset.partialContent || "";
 
       if (e && e.name === "AbortError") {
-        if (contentEl) contentEl.innerHTML = marked.parse(currentContent + "\n\n⏹ **生成を停止しました。**");
+        const stoppedContent = currentContent + "\n\n⏹ **生成を停止しました。**";
+        if (contentEl) contentEl.innerHTML = marked.parse(stoppedContent);
+        // ★ 停止時もユーザーメッセージと途中の応答を履歴に保存（Edit/Regenerate対応）
+        currentMsgDiv.dataset.content = stoppedContent;
+        messages.push(userMessageForHistory);
+        messages.push({ role: "assistant", content: stoppedContent });
+        persistHistory();
       } else if (isLikelyServerOffline(e) && !currentContent) {
         // 生成が始まる前のエラーのみ「接続できませんでした」と表示
         if (contentEl) contentEl.textContent = "接続できませんでした。LM Studioが起動していない可能性があります。";
