@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `chatDraft_v1.6` → `localLLMChat_draft`
   - `chatPresetLabels_v1.6` → `localLLMChat_presetLabels`
 - **CORS関連記載削除** - LM Studio v0.4.xでは不要のため
+- **バージョン表記位置変更** - ヘッダータイトルから右下隅に移動
+
+### Fixed
+- **応答停止後のEdit/Regenerateボタンが機能しない問題を修正**
+  - ストリーミング停止時にユーザーメッセージと途中の応答を履歴に保存するよう修正
+  - 比較モードでも同様の修正を適用
 
 ### Technical Details
 - 旧バージョンからのデータ移行は自動で行われる（マイグレーション関数）
