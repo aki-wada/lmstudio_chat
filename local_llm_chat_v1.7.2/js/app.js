@@ -81,6 +81,7 @@
     PRESETS: "localLLMChat_presets",
     DRAFT: "localLLMChat_draft",
     PRESET_LABELS: "localLLMChat_presetLabels",
+    SYSTEM_PROMPT_PRESETS: "localLLMChat_systemPromptPresets",  // v1.7.2
   });
 
   // 旧バージョンのキー（マイグレーション用）
@@ -215,6 +216,9 @@
     tempValue: document.getElementById("tempValue"),
     maxTokens: document.getElementById("maxTokens"),
     systemPrompt: document.getElementById("systemPrompt"),
+    systemPromptPresetSelect: document.getElementById("systemPromptPresetSelect"),  // v1.7.2
+    saveSystemPromptPresetBtn: document.getElementById("saveSystemPromptPresetBtn"),  // v1.7.2
+    deleteSystemPromptPresetBtn: document.getElementById("deleteSystemPromptPresetBtn"),  // v1.7.2
     responseStyle: document.getElementById("responseStyle"),
     sendKey: document.getElementById("sendKey"),
     userLevel: document.getElementById("userLevel"),
@@ -2333,6 +2337,125 @@ AI応答テキスト:
   }
 
   // ---------------------------------------------------------------------------
+  // System Prompt Presets (v1.7.2)
+  // ---------------------------------------------------------------------------
+
+  const DEFAULT_SYSTEM_PROMPT = `あなたは放射線画像診断、技術、研究のエキスパートアシスタントです。日本語で簡潔でバランスの取れたアドバイスを提供してください。フォーマルとカジュアルのバランスを保ち、専門用語は英語（日本語）の形式で表記してください。
+応答の生成の前に、まず質問内容を確認し、医学用語についてユーザの入力に不備があれば、ユーザに確認してください。`;
+
+  /**
+   * System Promptプリセットを読み込む
+   * @returns {Object<string, string>} プリセット名とプロンプトのマップ
+   */
+  function loadSystemPromptPresets() {
+    const raw = localStorage.getItem(STORAGE_KEYS.SYSTEM_PROMPT_PRESETS) || "{}";
+    return safeJSONParse(raw, {});
+  }
+
+  /**
+   * System Promptプリセットを保存する
+   * @param {Object<string, string>} presets
+   */
+  function saveSystemPromptPresets(presets) {
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_PROMPT_PRESETS, JSON.stringify(presets));
+  }
+
+  /**
+   * System Promptプリセットドロップダウンを更新する
+   */
+  function updateSystemPromptPresetSelect() {
+    if (!el.systemPromptPresetSelect) return;
+
+    const presets = loadSystemPromptPresets();
+    const currentValue = el.systemPromptPresetSelect.value;
+
+    // クリアして再構築
+    el.systemPromptPresetSelect.innerHTML = '<option value="">-- プリセットを選択 --</option>';
+
+    // デフォルトプリセットを追加
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "__default__";
+    defaultOption.textContent = "📌 デフォルト（放射線診断エキスパート）";
+    el.systemPromptPresetSelect.appendChild(defaultOption);
+
+    // ユーザー定義プリセットを追加
+    for (const [name, _prompt] of Object.entries(presets)) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      el.systemPromptPresetSelect.appendChild(option);
+    }
+
+    // 選択状態を復元
+    if (currentValue) {
+      el.systemPromptPresetSelect.value = currentValue;
+    }
+  }
+
+  /**
+   * System Promptプリセットを適用する
+   * @param {string} presetKey
+   */
+  function applySystemPromptPreset(presetKey) {
+    if (!presetKey) return;
+
+    let prompt;
+    if (presetKey === "__default__") {
+      prompt = DEFAULT_SYSTEM_PROMPT;
+    } else {
+      const presets = loadSystemPromptPresets();
+      prompt = presets[presetKey];
+    }
+
+    if (prompt) {
+      el.systemPrompt.value = prompt;
+      saveSettingsFromUI();
+      notify(`✅ System Prompt「${presetKey === "__default__" ? "デフォルト" : presetKey}」を適用しました`);
+    }
+  }
+
+  /**
+   * 現在のSystem Promptを新規プリセットとして保存する
+   */
+  function saveCurrentAsSystemPromptPreset() {
+    const name = prompt("新しいプリセット名を入力してください:");
+    if (!name || !name.trim()) return;
+
+    const trimmedName = name.trim();
+    if (trimmedName === "__default__") {
+      notify("⚠️ この名前は使用できません");
+      return;
+    }
+
+    const presets = loadSystemPromptPresets();
+    presets[trimmedName] = el.systemPrompt.value;
+    saveSystemPromptPresets(presets);
+    updateSystemPromptPresetSelect();
+    el.systemPromptPresetSelect.value = trimmedName;
+    notify(`✅ プリセット「${trimmedName}」を保存しました`);
+  }
+
+  /**
+   * 選択中のSystem Promptプリセットを削除する
+   */
+  function deleteSelectedSystemPromptPreset() {
+    const selected = el.systemPromptPresetSelect.value;
+    if (!selected || selected === "__default__") {
+      notify("⚠️ 削除できるプリセットを選択してください");
+      return;
+    }
+
+    if (!confirm(`プリセット「${selected}」を削除しますか？`)) return;
+
+    const presets = loadSystemPromptPresets();
+    delete presets[selected];
+    saveSystemPromptPresets(presets);
+    updateSystemPromptPresetSelect();
+    el.systemPromptPresetSelect.value = "";
+    notify(`🗑 プリセット「${selected}」を削除しました`);
+  }
+
+  // ---------------------------------------------------------------------------
   // Export / Clear
   // ---------------------------------------------------------------------------
 
@@ -3102,6 +3225,22 @@ AI応答テキスト:
       };
     }
 
+    // v1.7.2: System Promptプリセット
+    if (el.systemPromptPresetSelect) {
+      el.systemPromptPresetSelect.onchange = () => {
+        const selected = el.systemPromptPresetSelect.value;
+        if (selected) {
+          applySystemPromptPreset(selected);
+        }
+      };
+    }
+    if (el.saveSystemPromptPresetBtn) {
+      el.saveSystemPromptPresetBtn.onclick = saveCurrentAsSystemPromptPreset;
+    }
+    if (el.deleteSystemPromptPresetBtn) {
+      el.deleteSystemPromptPresetBtn.onclick = deleteSelectedSystemPromptPreset;
+    }
+
     el.modelSelect.addEventListener("change", async (e) => {
       const id = /** @type {HTMLSelectElement} */ (e.target).value;
       const details = runtime.modelDetails.get(id);
@@ -3407,6 +3546,7 @@ AI応答テキスト:
     loadCustomPresetLabels();
     renderPresetUI();
     loadPresetToEditor();
+    updateSystemPromptPresetSelect();  // v1.7.2: System Promptプリセット初期化
 
     renderHistoryFromStorage();
 

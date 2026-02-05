@@ -124,6 +124,13 @@
   </div>
   <div class="settings-row">
     <label>System Prompt:</label>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <select id="systemPromptPresetSelect" style="flex:1;max-width:300px">
+        <option value="">-- プリセットを選択 --</option>
+      </select>
+      <button id="saveSystemPromptPresetBtn" style="background:#28a745;padding:4px 12px" title="現在のSystem Promptを新規プリセットとして保存">💾 保存</button>
+      <button id="deleteSystemPromptPresetBtn" style="background:#dc3545;padding:4px 12px" title="選択中のプリセットを削除">🗑</button>
+    </div>
     <textarea id="systemPrompt">あなたは放射線画像診断、技術、研究のエキスパートアシスタントです。日本語で簡潔でバランスの取れたアドバイスを提供してください。フォーマルとカジュアルのバランスを保ち、専門用語は英語（日本語）の形式で表記してください。
 応答の生成の前に、まず質問内容を確認し、医学用語についてユーザの入力に不備があれば、ユーザに確認してください。</textarea>
   </div>
