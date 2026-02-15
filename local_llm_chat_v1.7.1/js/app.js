@@ -1131,11 +1131,17 @@ ${APP_MANUAL_CONTENT}
       last = m.role;
     }
 
-    // 末尾がassistantなら削って「次のassistant生成」に備える
-    if (conv.length > 1 && conv.at(-1).role === "assistant") conv.pop();
+    // 末尾を整理: 新しいuserMessageが後に追加されるため、
+    // 履歴は ...user, assistant で終わるのが正しい。
+    // もし末尾が user で終わっている場合（削除操作等）のみ除去する。
+    if (conv.length > 1 && conv.at(-1).role === "user") conv.pop();
 
     // systemは常に残し、残りを末尾から LIMITS.MAX_HISTORY_FOR_API-1 個取る
     const tail = conv.slice(1).slice(-(LIMITS.MAX_HISTORY_FOR_API - 1));
+
+    // tailが assistant で始まる場合、対応するuserが欠落しているので除去
+    if (tail.length > 0 && tail[0].role === "assistant") tail.shift();
+
     return [conv[0], ...tail];
   }
 

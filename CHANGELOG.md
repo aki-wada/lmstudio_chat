@@ -11,6 +11,33 @@ All notable changes to Local LLM Chat will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-02-09
+
+### Added
+- **🔄 モデル自動アンロード機能** - モデル切替時に前のモデルを自動アンロード
+  - 設定パネルでON/OFF切替可能（デフォルト: OFF）
+  - LM Studio v0.4以降の `/api/v1/models/unload` エンドポイントを使用
+  - メモリ（VRAM）節約に有効
+  - 未ロードモデル選択→ロード時にも前モデルをアンロード
+  - ロード済みモデル間の切替時にも前モデルをアンロード
+  - アンロード失敗時は切替処理を続行（エラーで中断しない）
+
+### Documentation
+- **マニュアルに「メモリ使用量の確認方法」セクションを追加** - LM Studio の Resource Consumption Widget の有効化手順を記載
+  - Developer → Experimental Settings → Show Resource Consumption Widget → ON
+  - メモリ不足のサインにWidget表示の目安（90%以上）を追加
+
+### Fixed
+- **会話履歴の重複応答バグ修正** - `buildConversation()`が最新のassistant応答を誤って削除し、APIに連続するuserメッセージが送信される問題を修正
+  - 修正前: 末尾のassistant応答をpop → 前のuser質問と新しいuser質問が連続 → LLMが前回の応答内容を繰り返す
+  - 修正後: assistant応答を保持し、正しい user→assistant→user(新) の交互配列を維持
+  - 全バージョン（v1.1〜v2.0）に同一のバグが存在したため一括修正
+
+### Notes
+- 比較モード（📊）使用時は自動アンロードをOFFにする必要あり（2つのモデルを同時ロードするため）
+
+---
+
 ## [1.7.2] - 2026-02-04
 
 ### Added
@@ -140,6 +167,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 - LM Studio v0.3.39以降推奨
 - Open Responses APIエンドポイント: `/v1/chat/completions` (logprobs: true)
+
+---
+
+## [1.6.6.1] - 2026-02-15
+
+### Fixed
+- **会話履歴の重複応答バグ修正** - `buildConversation()`が最新のassistant応答を誤って削除し、APIに連続するuserメッセージが送信される問題を修正
+  - 修正前: 末尾のassistant応答をpop → 前のuser質問と新しいuser質問が連続 → LLMが前回の応答内容を繰り返す
+  - 修正後: assistant応答を保持し、正しい user→assistant→user(新) の交互配列を維持
 
 ---
 
@@ -422,10 +458,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **バージョン履歴**
 
+- [1.7.3] - 2026-02-09 - モデル自動アンロード機能、会話履歴の重複応答バグ修正
+- [1.7.2] - 2026-02-04 - 医学用語チェック機能、System Promptプリセット機能、比較ボタン位置変更
 - [1.7.1] - 2026-02-02 - Apple Siliconメモリガイド、MLX推奨モデル、localStorageキー名変更
 - [1.7.0] - 2026-02-01 - モデル比較機能、モデルリスト自動更新、ヘッダーUI改善
 - [1.6.8] - 2026-01-21 - 新しい話題ボタン、ヘッダーボタン簡略化、鑑別診断プリセット更新
 - [1.6.7] - 2026-01-20 - 信頼度表示、代替候補表示、会話履歴インポート、Regenerate修正、Open Responses API対応
+- [1.6.6.1] - 2026-02-15 - 会話履歴の重複応答バグ修正
 - [1.6.6] - 2026-01-19 - ヘルプモード、モデル切り替えバグ修正
 - [1.6.5] - 2026-01-17 - ファイルサイズ制限調整、マニュアル改善、免責事項追加
 - [1.6.4] - 2025-12-23 - スマートスクロール、Ctrl+Enter/Stopボタンバグ修正

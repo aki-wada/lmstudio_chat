@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Local LLM Chat v1.6.6 マニュアル</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    line-height: 1.8;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    color: #333;
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 24px;
+    border-bottom: 3px solid #007bff;
+    padding-bottom: 10px;
+    margin-bottom: 30px;
+  }
+
+  h2 {
+    font-size: 18px;
+    color: #007bff;
+    border-left: 4px solid #007bff;
+    padding-left: 12px;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 15px;
+    color: #333;
+    margin-top: 25px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 10px 0;
+  }
+
+  ul, ol {
+    margin: 10px 0;
+    padding-left: 25px;
+  }
+
+  li {
+    margin: 5px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 13px;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: bold;
+  }
+
+  code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 30px 0;
+  }
+
+  strong {
+    color: #222;
+  }
+
+  .disclaimer {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+  }
+
+  .disclaimer h2 {
+    color: #856404;
+    border-left-color: #ffc107;
+  }
+
+  @media print {
+    body {
+      padding: 20px;
+      font-size: 12px;
+    }
+
+    h1 {
+      font-size: 20px;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-top: 25px;
+    }
+
+    h3 {
+      font-size: 14px;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Local LLM Chat v1.6.6 マニュアル</h1>
+
+<h2>概要</h2>
+<p>Local LLM Chatは、ローカルで動作するLLMサーバー（LM Studio、Ollamaなど）と連携するWebベースのチャットインターフェースです。完全オフラインで動作し、プライバシーを重視した設計になっています。</p>
+
+<hr>
+
+<h2>動作要件</h2>
+<ul>
+  <li><strong>ブラウザ</strong>: Chrome、Firefox、Safari、Edge（モダンブラウザ）</li>
+  <li><strong>LLMサーバー</strong>: LM Studio または Ollama</li>
+  <li><strong>デフォルトURL</strong>: <code>http://localhost:1234/v1</code></li>
+</ul>
+
+<hr>
+
+<h2>起動方法</h2>
+<ol>
+  <li>LM Studioを起動し、モデルをロード</li>
+  <li>LM Studioの「Local Server」を開始（デフォルト: ポート1234）
+    <ul>
+      <li>LM Studioの左側メニューから「<strong>開発者</strong>」（Developer）タブを開く</li>
+      <li>「<strong>Status: Stopped</strong>」と表示されているスイッチをクリックして「<strong>Status: Running</strong>」に切り替える</li>
+      <li>これでLocal Serverが開始され、デフォルトではポート番号 <strong>1234</strong> で起動します</li>
+      <li>サーバーが正常に起動すると、「Reachable at: http://127.0.0.1:1234」などのメッセージが表示されます</li>
+      <li><strong>重要</strong>: 「<strong>Server Settings</strong>」タブを開き、「<strong>CORSを有効にする</strong>」（Enable CORS）のトグルスイッチを<strong>ON</strong>にしてください</li>
+      <li>ポート番号を変更する場合は、Settingsの「🔗 Base URL」も同じポート番号に合わせて変更してください</li>
+    </ul>
+  </li>
+  <li><code>local_llm_chat_v1.6.6.html</code> をブラウザで開く</li>
+  <li>モデルが自動的にドロップダウンに表示される</li>
+</ol>
+
+<hr>
+
+<h2>画面構成</h2>
+
+<h3>ヘッダー</h3>
+<ul>
+  <li><strong>タイトル</strong>: Local LLM Chat v1.6.6</li>
+  <li><strong>モデル選択</strong>: ロードされているモデルを選択（👁️マークはVision対応）</li>
+  <li><strong>🔄 Refresh</strong>: モデル一覧を再取得</li>
+  <li><strong>🗑 Clear</strong>: 会話履歴をクリア</li>
+  <li><strong>💾 Export</strong>: 会話履歴をJSONでエクスポート</li>
+  <li><strong>⚙️ Settings</strong>: 設定パネルを開く</li>
+</ul>
+
+<h3>入力エリア（画面下部）</h3>
+<ul>
+  <li><strong>📷 Image</strong>: 画像ファイルを添付（複数可）</li>
+  <li><strong>📎 File</strong>: テキスト/PDFファイルを添付（複数可）</li>
+  <li><strong>🔍 深掘り</strong>: 深掘りモードのON/OFF</li>
+  <li><strong>❓ Help</strong>: ヘルプモードのON/OFF（アプリの使い方をLLMに質問）</li>
+  <li><strong>テキスト入力欄</strong>: メッセージを入力</li>
+  <li><strong>🚀 Send</strong>: メッセージを送信</li>
+  <li><strong>⏹ Stop</strong>: 生成を中断</li>
+  <li><strong>📋 Preset</strong>: プリセットプロンプトを挿入</li>
+</ul>
+
+<hr>
+
+<h2>主な機能</h2>
+
+<h3>1. チャット機能</h3>
+<ul>
+  <li><strong>ストリーミング応答</strong>: リアルタイムでAIの回答を表示</li>
+  <li><strong>Markdown対応</strong>: コードブロック、リスト、表などを整形表示</li>
+  <li><strong>メッセージ操作</strong>:
+    <ul>
+      <li>📋 Copy: メッセージをコピー</li>
+      <li>🗑 Delete: メッセージを削除</li>
+      <li>✏️ Edit: ユーザーメッセージを編集・再送信</li>
+      <li>🔄 Regenerate: AI応答を再生成</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>2. 画像・ファイル添付</h3>
+<ul>
+  <li><strong>画像添付</strong>: Vision対応モデルで画像を認識
+    <ul>
+      <li>📷 Imageボタン、ペースト（Ctrl+V）、ドラッグ＆ドロップ対応</li>
+      <li>複数画像の同時添付可能</li>
+      <li>サムネイルプレビュー表示</li>
+      <li><strong>サイズ制限: 20MB以下</strong></li>
+    </ul>
+  </li>
+  <li><strong>ファイル添付</strong>: テキストファイルやPDFの内容を送信
+    <ul>
+      <li>対応形式: .txt, .md, .json, .csv, .xml, .html, .css, .js, .py, .pdf など</li>
+      <li>PDF: テキスト抽出してLLMに送信</li>
+      <li><strong>サイズ制限: テキストファイル2MB以下、PDF10MB以下</strong></li>
+    </ul>
+  </li>
+</ul>
+
+<h3>3. Vision対応モデル表示</h3>
+<ul>
+  <li>ドロップダウンにVision対応モデルは👁️アイコン付きで表示</li>
+  <li>対応キーワード: vision, llava, gemma-3, pixtral, devstral, magistral, qwen-vl, qwen2-vl, qwen3-vl, bakllava, obsidian, moondream, minicpm-v, cogvlm, glm-4v, internlm-xcomposer など</li>
+</ul>
+
+<h3>4. 深掘りモード</h3>
+<p>🔍深掘りボタンで有効化すると、より深く分析した回答を促します：</p>
+<ul>
+  <li>根本的な原因や背景の分析</li>
+  <li>異なる視点や解釈の可能性</li>
+  <li>関連する概念や理論との繋がり</li>
+  <li>潜在的な問題点や限界</li>
+  <li>実践的な応用や次のステップ</li>
+</ul>
+<p>※ 深掘りモードはページをリロードするとOFFに戻ります。</p>
+
+<h3>5. ヘルプモード（v1.6.6新機能）</h3>
+<p>❓ Helpボタンで有効化すると、このアプリの使い方をLLMに質問できます：</p>
+<ul>
+  <li>アプリの機能や操作方法について質問</li>
+  <li>トラブルシューティングのヘルプ</li>
+  <li>設定項目の説明</li>
+</ul>
+<p>ヘルプモードON時は、アプリのマニュアル内容がシステムプロンプトに含まれ、LLMがマニュアルを参照して回答します。</p>
+<p>※ ヘルプモードはページをリロードするとOFFに戻ります。</p>
+
+<h3>6. スマートスクロール（v1.6.4新機能）</h3>
+<p>ストリーミング応答中のスクロール操作が可能になりました：</p>
+<ul>
+  <li><strong>上にスクロール</strong>: 自動スクロールが一時停止し、過去のメッセージを確認可能</li>
+  <li><strong>下部に戻る</strong>: 自動スクロールが再開</li>
+</ul>
+
+<h3>7. プリセットプロンプト</h3>
+<p>📋 Presetボタンで定型プロンプトを挿入：</p>
+<ul>
+  <li>🏥 疾患解説</li>
+  <li>💊 鑑別診断</li>
+  <li>📄 文章要約</li>
+  <li>📝 論文査読</li>
+  <li>📈 統計解析</li>
+  <li>✉️ 英文メール作成</li>
+</ul>
+<p>Settingsでプリセットの編集・追加も可能です。</p>
+
+<hr>
+
+<h2>設定項目</h2>
+
+<h3>基本設定</h3>
+<table>
+  <tr><th>項目</th><th>説明</th><th>デフォルト</th></tr>
+  <tr><td>🌙 Dark Mode</td><td>ダークモードの切替</td><td>OFF</td></tr>
+  <tr><td>🔗 Base URL</td><td>LLMサーバーのURL</td><td>http://localhost:1234/v1</td></tr>
+  <tr><td>🔑 API Key</td><td>認証キー</td><td>lmstudio</td></tr>
+  <tr><td>Temperature</td><td>創造性（0=安定、2=創造的）</td><td>0.7</td></tr>
+  <tr><td>Max Tokens</td><td>最大出力トークン数</td><td>2048</td></tr>
+  <tr><td>送信キー</td><td>メッセージ送信のキー設定</td><td>Enter で送信</td></tr>
+</table>
+
+<h3>送信キー設定</h3>
+<table>
+  <tr><th>設定</th><th>Enter</th><th>Shift+Enter</th><th>Ctrl/Cmd+Enter</th></tr>
+  <tr><td>Enter で送信</td><td>送信</td><td>改行</td><td>-</td></tr>
+  <tr><td>Ctrl+Enter で送信</td><td>改行</td><td>改行</td><td>送信</td></tr>
+</table>
+
+<h3>応答スタイル</h3>
+<table>
+  <tr><th>スタイル</th><th>説明</th></tr>
+  <tr><td>簡潔</td><td>要点のみを短く</td></tr>
+  <tr><td>標準</td><td>バランスの取れた回答</td></tr>
+  <tr><td>詳細</td><td>背景や具体例を含む</td></tr>
+  <tr><td>専門的</td><td>技術的詳細重視</td></tr>
+</table>
+
+<h3>ユーザープロフィール</h3>
+<table>
+  <tr><th>項目</th><th>説明</th></tr>
+  <tr><td>専門レベル</td><td>初心者〜専門家</td></tr>
+  <tr><td>職業/専門分野</td><td>例: 放射線科医、学生</td></tr>
+  <tr><td>興味・関心</td><td>例: CT画像診断、機械学習</td></tr>
+</table>
+
+<h3>データ管理</h3>
+<ul>
+  <li><strong>🔄 設定をデフォルトに戻す</strong>: 設定のみリセット</li>
+  <li><strong>🗑 すべての保存データを消す</strong>: 履歴・設定・プリセットを全削除</li>
+</ul>
+
+<hr>
+
+<h2>キーボードショートカット</h2>
+<table>
+  <tr><th>ショートカット</th><th>動作</th></tr>
+  <tr><td>Enter</td><td>メッセージ送信（設定による）</td></tr>
+  <tr><td>Ctrl/Cmd + Enter</td><td>メッセージ送信（設定による）</td></tr>
+  <tr><td>Shift + Enter</td><td>改行</td></tr>
+  <tr><td>Ctrl/Cmd + V</td><td>画像をペースト</td></tr>
+  <tr><td>Ctrl/Cmd + K</td><td>履歴クリア</td></tr>
+  <tr><td>Esc</td><td>設定パネル/プリセットパネルを閉じる</td></tr>
+</table>
+<p>※ 送信キーは Settings で「Enter で送信」または「Ctrl+Enter で送信」に切り替え可能</p>
+
+<hr>
+
+<h2>トラブルシューティング</h2>
+
+<h3>モデルが表示されない</h3>
+<ol>
+  <li>LM Studioが起動しているか確認</li>
+  <li>開発者タブでLocal Serverが開始されているか確認（<strong>Status: Running</strong>になっているか）</li>
+  <li><strong>CORSが有効になっているか確認</strong>（Server Settings → 「CORSを有効にする」がONになっているか）</li>
+  <li>Base URLが正しいか確認（デフォルト: http://localhost:1234/v1）</li>
+  <li>🔄 Refreshボタンをクリック</li>
+</ol>
+
+<h3>画像が認識されない</h3>
+<ol>
+  <li>Vision対応モデル（👁️マーク付き）を選択しているか確認</li>
+  <li>画像サイズが20MB以下か確認</li>
+  <li>モデルサイズは30B以上を推奨</li>
+</ol>
+
+<h3>応答が遅い・途切れる</h3>
+<ol>
+  <li>Max Tokensを減らす</li>
+  <li>より小さいモデルに変更</li>
+  <li>PCのメモリ・GPU使用状況を確認</li>
+</ol>
+
+<h3>接続エラーが発生する</h3>
+<ol>
+  <li>LM Studioの開発者タブでLocal Serverが起動しているか確認（<strong>Status: Running</strong>になっているか）</li>
+  <li>Server Settingsで「<strong>CORSを有効にする</strong>」がONになっているか確認</li>
+  <li>ブラウザの開発者ツール（F12）でエラーメッセージを確認</li>
+  <li>Base URLが正しいか確認（<code>http://localhost:1234/v1</code> または設定したポート番号）</li>
+</ol>
+
+<h3>応答が途中で消える</h3>
+<ol>
+  <li>Settings → 「🗑 すべての保存データを消す」で履歴をクリア</li>
+  <li>ページを強制リロード（Cmd+Shift+R または Ctrl+Shift+R）</li>
+  <li>古いキャッシュが残っている可能性があるため、ブラウザキャッシュをクリア</li>
+</ol>
+
+<hr>
+
+<h2>データ保存について</h2>
+<p>すべてのデータはブラウザのlocalStorageに保存されます：</p>
+<ul>
+  <li><code>chatHistory_v1.6</code>: 会話履歴</li>
+  <li><code>chatSettings_v1.6</code>: 設定</li>
+  <li><code>chatPresets_v1.6</code>: カスタムプリセットの内容</li>
+  <li><code>chatPresetLabels_v1.6</code>: カスタムプリセットのラベル</li>
+  <li><code>chatDraft_v1.6</code>: 入力中の下書き（自動保存）</li>
+</ul>
+<p>データはブラウザを閉じても保持されます。プライベートモード/シークレットモードでは保存されません。</p>
+
+<h3>コンテキスト管理</h3>
+<p>APIには最後の6メッセージ（システムプロンプト含む）のみ送信されます。これはモデルのコンテキスト長を効率的に使用するための仕様です。会話履歴自体はすべてlocalStorageに保存されます。</p>
+
+<hr>
+
+<h2>技術情報</h2>
+<ul>
+  <li><strong>対応API</strong>: OpenAI互換API（LM Studio、Ollama、LocalAI など）</li>
+  <li><strong>外部ライブラリ</strong>: marked.js（Markdown）、PDF.js（PDF抽出）</li>
+  <li><strong>オフライン対応</strong>: すべてのライブラリはローカルに同梱</li>
+</ul>
+
+<hr>
+
+<h2>バージョン履歴</h2>
+
+<h3>v1.6.6 (2026-01-19)</h3>
+<ul>
+  <li><strong>新機能</strong>
+    <ul>
+      <li>ヘルプモード: ❓ Helpボタンでアプリの使い方をLLMに質問できる機能を追加</li>
+    </ul>
+  </li>
+  <li><strong>バグ修正</strong>
+    <ul>
+      <li>会話中のLLMモデル切り替えが正しく反映されない問題を修正</li>
+      <li>モデル選択時に設定が即座に更新されるように改善</li>
+      <li>API呼び出し時にUI上のモデル選択を優先するように変更</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>v1.6.5 (2026-01-17)</h3>
+<ul>
+  <li><strong>バグ修正</strong>
+    <ul><li>長いファイル名の添付時に入力エリアが拡大する問題を修正</li></ul>
+  </li>
+  <li><strong>改善</strong>
+    <ul>
+      <li>ファイルサイズ制限の調整（テキスト: 1MB→2MB、PDF: 5MB→10MB）</li>
+      <li>マニュアルの改善・詳細化</li>
+      <li>免責事項の追加</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>v1.6.4 (2025-12-23)</h3>
+<ul>
+  <li><strong>バグ修正</strong>: Ctrl+Enter送信設定、Stopボタンの問題を修正</li>
+  <li><strong>新機能</strong>: スマートスクロール</li>
+  <li><strong>マニュアルの詳細化</strong></li>
+</ul>
+
+<h3>v1.6.3 (2025-12-23)</h3>
+<p>v1.6.2 と同内容（バージョン番号整理）</p>
+
+<h3>v1.6.2 (2025-12-23)</h3>
+<p>重複メッセージ送信バグの修正、送信キー設定の追加、デバッグログ機能</p>
+
+<h3>v1.6.1 (2025-12-22)</h3>
+<p>Vision対応モデル表示、画像サムネイルプレビュー、編集機能、深掘りモード</p>
+
+<h3>v1.6 (2025-12-22)</h3>
+<p>設定リセット機能、全データクリア機能、複数ファイル添付対応、外部ファイル分割</p>
+
+<hr>
+
+<div class="disclaimer">
+<h2>免責事項</h2>
+<p>本ソフトウェア（Local LLM Chat）は「現状有姿」で提供されます。作成者は、本ソフトウェアの使用または使用不能から生じるいかなる損害（直接的、間接的、偶発的、特別、結果的損害を含むがこれに限定されない）についても、一切の責任を負いません。</p>
+
+<p>本ソフトウェアを使用することにより、ユーザーは以下の事項に同意したものとみなされます：</p>
+<ol>
+  <li><strong>自己責任での使用</strong>: 本ソフトウェアの使用は、すべてユーザー自身の責任において行われます。</li>
+  <li><strong>無保証</strong>: 作成者は、本ソフトウェアの正確性、信頼性、完全性、有用性について、いかなる保証も行いません。</li>
+  <li><strong>AI出力の検証</strong>: AIによる出力結果は参考情報であり、重要な判断を行う前には必ず専門家への相談や独自の検証を行ってください。</li>
+  <li><strong>医療・法律・財務への非適用</strong>: 本ソフトウェアは医療診断、法的助言、財務アドバイスを提供するものではありません。これらの分野での判断には、必ず資格を持つ専門家にご相談ください。</li>
+</ol>
+<p>本ソフトウェアを使用した時点で、上記の免責事項に同意したものとみなされます。</p>
+</div>
+
+</body>
+</html>
