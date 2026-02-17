@@ -11,6 +11,56 @@ All notable changes to Local LLM Chat will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1] - 2026-02-17
+
+### Added
+- **🔍 表示モデル管理（モデルフィルター）** - ドロップダウンに表示するモデルを選択可能
+  - 設定 → 詳細タブ → 「表示モデル管理」セクション
+  - 「🔄 モデル一覧を取得」で全モデルをチェックボックスリストに表示
+  - チェックを外したモデルはドロップダウンから非表示に
+  - 「全選択」「全解除」ボタンで一括操作
+  - フィルター設定はlocalStorageに保存・復元（キー: `localLLMChat_modelFilter`）
+  - フィルター未設定時は従来通り全モデル表示（フォールバック）
+  - 「すべての保存データを消す」でフィルター設定もクリア
+
+### Fixed
+- **テーブル内の `<br>` 表示問題を修正** - `marked.js` の `breaks: true` オプションにより、テーブルセル内の改行が `<br>` タグとして表示されていた問題を修正
+  - カスタム `tablecell` レンダラーを追加し、セル内の `<br>` を除去
+  - 通常テキストの改行処理（`breaks: true`）には影響なし
+
+### Changed
+- **デザイン更新** - グラスモーフィズムUI（v2からの外観移植）
+  - カラーパレット: インディゴ → ブルー（#0a84ff系）
+  - フォント: Inter → SF Pro Text
+  - Toolbar/入力エリア/設定パネル: フロストガラス効果（backdrop-filter: blur + saturate）
+  - ユーザーバブル: 落ち着いた青グラデーション＋白文字
+  - AIメッセージ: 半透明フロストガラス風背景
+  - ダークモード: 完全対応
+
+---
+
+## [2.0] - 2026-02-16
+
+### Added
+- **UIフルリニューアル** - ChatGPT/Claude風のモダンUI（v1.7.3のフルスクラッチ再構築）
+  - セマンティックHTML、ARIA対応
+  - CSS Custom Properties + BEM命名規則
+  - IIFE構造のJavaScript（28セクション）
+  - フローティングカード型入力エリア（角丸24px）
+  - コードブロック: ダーク背景＋言語ヘッダー＋Copyボタン
+  - ストリーミング: ドットアニメーション＋カーソル点滅
+  - メッセージアクションのフェードインアニメーション
+  - 🤖 Assistant ロールラベル
+  - prefers-reduced-motion対応
+- **ヘッダー整理** - エクスポート/インポート/比較/ヘルプを「•••」メニューに集約
+
+### Technical Details
+- ファイル構成: `local_llm_chat_v2.0/` ディレクトリ（HTML + CSS + JS分離）
+- 外部ライブラリ: marked.js, PDF.js, KaTeX（すべてローカル同梱）
+- v1.7.3の全機能を継承
+
+---
+
 ## [1.7.3] - 2026-02-09
 
 ### Added
@@ -32,6 +82,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 修正前: 末尾のassistant応答をpop → 前のuser質問と新しいuser質問が連続 → LLMが前回の応答内容を繰り返す
   - 修正後: assistant応答を保持し、正しい user→assistant→user(新) の交互配列を維持
   - 全バージョン（v1.1〜v2.0）に同一のバグが存在したため一括修正
+- **応答内テーブルの罫線が表示されない問題を修正** - CSSにtable/th/tdスタイルが未定義だったため追加
+  - `.assistant table` に `border-collapse: collapse`、`th/td` に `border: 1px solid` を追加
+  - ダークモード用テーブルスタイルも追加（罫線 `#555`、ヘッダー背景 `#3a3a3a`）
+  - 比較モード（`.compare-message`）内のテーブルにも同様のスタイルを追加
+  - 幅の広いテーブル用に `overflow-x: auto`（横スクロール）対応を追加
+- **ダークモードでコードブロックが背景と同化する問題を修正** - `pre/code` の背景色を `#2d2d2d` → `#1e1e1e` に変更し、`.assistant` 背景（`#2d2d2d`）と区別可能に
+- **CSSキャッシュバスティング修正** - `app.css?v=1.7.2` → `app.css?v=1.7.3` に更新
 
 ### Notes
 - 比較モード（📊）使用時は自動アンロードをOFFにする必要あり（2つのモデルを同時ロードするため）
@@ -458,6 +515,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **バージョン履歴**
 
+- [2.1] - 2026-02-17 - 表示モデル管理（モデルフィルター）、グラスモーフィズムUI
+- [2.0] - 2026-02-16 - UIフルリニューアル（フルスクラッチ再構築）
 - [1.7.3] - 2026-02-09 - モデル自動アンロード機能、会話履歴の重複応答バグ修正
 - [1.7.2] - 2026-02-04 - 医学用語チェック機能、System Promptプリセット機能、比較ボタン位置変更
 - [1.7.1] - 2026-02-02 - Apple Siliconメモリガイド、MLX推奨モデル、localStorageキー名変更

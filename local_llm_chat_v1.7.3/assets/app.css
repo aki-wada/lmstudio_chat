@@ -54,6 +54,30 @@ header {
   align-self: flex-start;
 }
 
+/* === Table in Assistant Messages === */
+.assistant .message-content {
+  overflow-x: auto;
+}
+
+.assistant table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+  width: auto;
+  white-space: nowrap;
+}
+
+.assistant th,
+.assistant td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+}
+
+.assistant th {
+  background: #f0f0f0;
+  font-weight: 600;
+}
+
 .system {
   background: #eee;
   color: #333;
@@ -301,6 +325,15 @@ body.dark-mode .assistant {
   color: #e0e0e0;
 }
 
+body.dark-mode .assistant th,
+body.dark-mode .assistant td {
+  border: 1px solid #555;
+}
+
+body.dark-mode .assistant th {
+  background: #3a3a3a;
+}
+
 body.dark-mode .system {
   background: #333;
   color: #bbb;
@@ -358,7 +391,7 @@ body.dark-mode .msg-btn:hover {
 
 body.dark-mode pre,
 body.dark-mode code {
-  background: #2d2d2d;
+  background: #1e1e1e;
   color: #e0e0e0;
 }
 
@@ -716,6 +749,30 @@ body.dark-mode .separator-text {
   border-color: #ffc078;
 }
 
+/* Table in Compare Messages */
+.compare-message .message-content {
+  overflow-x: auto;
+}
+
+.compare-message table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+  width: auto;
+  white-space: nowrap;
+}
+
+.compare-message th,
+.compare-message td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+}
+
+.compare-message th {
+  background: #f0f0f0;
+  font-weight: 600;
+}
+
 /* レスポンシブ: モバイルでは縦並び */
 @media (max-width: 768px) {
   .compare-container {
@@ -739,6 +796,15 @@ body.dark-mode .compare-model-header.model-b {
 body.dark-mode .compare-message {
   background: #2d2d2d;
   color: #e0e0e0;
+}
+
+body.dark-mode .compare-message th,
+body.dark-mode .compare-message td {
+  border: 1px solid #555;
+}
+
+body.dark-mode .compare-message th {
+  background: #3a3a3a;
 }
 
 body.dark-mode .compare-message.model-a {
