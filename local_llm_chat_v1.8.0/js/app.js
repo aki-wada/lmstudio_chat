@@ -205,7 +205,6 @@
     darkMode: false,
     autoUnload: true,     // v1.7.3: モデル切替時に前のモデルを自動アンロード
     reasoningEffort: "",  // v1.8.0: reasoning_effort パラメータ（"", "low", "medium", "high"）
-    hideThinking: false,  // v1.8.0: 思考プロセスを折りたたむ
     showWelcome: true,    // v1.8.0: 起動時にオープニング画面を表示
   });
 
@@ -248,7 +247,6 @@
     darkModeToggle: document.getElementById("darkModeToggle"),
     autoUnloadToggle: document.getElementById("autoUnloadToggle"),      // v1.7.3
     reasoningEffort: document.getElementById("reasoningEffort"),        // v1.8.0
-    hideThinkingToggle: document.getElementById("hideThinkingToggle"), // v1.8.0
     showWelcomeToggle: document.getElementById("showWelcomeToggle"),   // v1.8.0
 
     // v1.7.2: 医学用語チェックモーダル
@@ -717,7 +715,6 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       darkMode: Boolean(s.darkMode),
       autoUnload: Boolean(s.autoUnload),        // v1.7.3
       reasoningEffort: s.reasoningEffort || "",  // v1.8.0
-      hideThinking: Boolean(s.hideThinking),     // v1.8.0
       showWelcome: s.showWelcome !== false,        // v1.8.0: デフォルトtrue
     });
   }
@@ -756,11 +753,6 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       el.reasoningEffort.value = settings.reasoningEffort || "";
     }
 
-    // v1.8.0: 思考プロセス表示設定
-    if (el.hideThinkingToggle) {
-      el.hideThinkingToggle.checked = Boolean(settings.hideThinking);
-    }
-
     // v1.8.0: オープニング画面表示設定
     if (el.showWelcomeToggle) {
       el.showWelcomeToggle.checked = settings.showWelcome !== false;
@@ -785,7 +777,6 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       darkMode: document.body.classList.contains("dark-mode"),
       autoUnload: el.autoUnloadToggle?.checked || false,       // v1.7.3
       reasoningEffort: el.reasoningEffort?.value || "",         // v1.8.0
-      hideThinking: el.hideThinkingToggle?.checked || false,   // v1.8.0
       showWelcome: el.showWelcomeToggle?.checked !== false,    // v1.8.0
     };
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
@@ -942,19 +933,21 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
     let isPartial = false;
 
     for (const { open, close } of patterns) {
-      const openIdx = main.indexOf(open);
-      if (openIdx === -1) continue;
-
-      const closeIdx = main.indexOf(close, openIdx + open.length);
-      if (closeIdx === -1) {
-        // 閉じタグがない = ストリーミング中（部分的）
-        thinking += main.slice(openIdx + open.length);
-        main = main.slice(0, openIdx);
-        isPartial = true;
-      } else {
-        // 完全なブロック
-        thinking += main.slice(openIdx + open.length, closeIdx);
-        main = main.slice(0, openIdx) + main.slice(closeIdx + close.length);
+      // 同じタグの全出現を繰り返し抽出
+      let idx;
+      while ((idx = main.indexOf(open)) !== -1) {
+        const closeIdx = main.indexOf(close, idx + open.length);
+        if (closeIdx === -1) {
+          // 閉じタグがない = ストリーミング中（部分的）
+          thinking += main.slice(idx + open.length);
+          main = main.slice(0, idx);
+          isPartial = true;
+          break;
+        } else {
+          // 完全なブロック
+          thinking += main.slice(idx + open.length, closeIdx);
+          main = main.slice(0, idx) + main.slice(closeIdx + close.length);
+        }
       }
     }
 
@@ -967,16 +960,9 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
    * @param {boolean} isPartial - ストリーミング中か
    * @returns {string} HTML文字列
    */
-  function renderThinkingHtml(thinking, isPartial) {
-    if (!thinking) return "";
-
-    const summary = isPartial ? "思考中..." : "思考プロセス";
-    const openAttr = (!settings.hideThinking && thinking) ? " open" : "";
-
-    return `<details class="thinking-block"${openAttr}>
-      <summary>${summary}</summary>
-      <div class="thinking-content">${marked.parse(thinking)}</div>
-    </details>`;
+  function renderThinkingHtml() {
+    // 思考プロセスは常に非表示
+    return "";
   }
 
   // ---------------------------------------------------------------------------
@@ -2177,17 +2163,13 @@ ${APP_MANUAL_CONTENT}
         try {
           const j = JSON.parse(payload);
 
-          // v1.8.0: reasoning delta を <think>タグでラップしてcontentに統合
-          let delta =
+          const delta =
             j.choices?.[0]?.delta?.content ??
             j.choices?.[0]?.text ??
             "";
           const reasoningDelta = j.choices?.[0]?.delta?.reasoning ?? "";
-          if (reasoningDelta) {
-            delta = `<think>${reasoningDelta}</think>` + delta;
-          }
 
-          if (delta) onDelta(delta);
+          if (delta || reasoningDelta) onDelta(delta, reasoningDelta);
         } catch {
           // 不完全JSONは次チャンクで完成（元実装踏襲）
         }
@@ -2202,7 +2184,8 @@ ${APP_MANUAL_CONTENT}
         try {
           const j = JSON.parse(line);
           const delta = j.choices?.[0]?.delta?.content ?? j.choices?.[0]?.text ?? "";
-          if (delta) onDelta(delta);
+          const reasoningDelta = j.choices?.[0]?.delta?.reasoning ?? "";
+          if (delta || reasoningDelta) onDelta(delta, reasoningDelta);
         } catch { /* incomplete JSON */ }
       }
     }
@@ -2348,10 +2331,10 @@ ${APP_MANUAL_CONTENT}
         const reader = res.body.getReader();
         let content = "";
 
-        await consumeSSEWithLogprobs(
+        await consumeSSE(
           reader,
-          (delta) => {
-            content += delta;
+          (delta, _reasoningDelta) => {
+            if (delta) content += delta;
             updateContent(content);
             const contentEl = msgEl.querySelector(".message-content");
             if (contentEl) contentEl.innerHTML = marked.parse(content);
@@ -2530,31 +2513,43 @@ ${APP_MANUAL_CONTENT}
 
         const reader = res.body.getReader();
         let content = "";
+        let reasoning = "";
         let messagesSaved = false;
+
+        /** ストリーミング中の表示を更新する共通関数 */
+        function updateStreamingUI(isFinal) {
+          const contentEl = currentMsgDiv.querySelector(".message-content");
+          if (!contentEl) return;
+
+          // API reasoning フィールド経由の思考プロセス
+          let thinkHtml = "";
+          if (reasoning) {
+            thinkHtml = renderThinkingHtml(reasoning, !isFinal);
+          }
+
+          // content 内の <think> タグも抽出（モデルが直接出力する場合）
+          const { thinking: inlineThinking, main, isPartial } = extractThinkingBlocks(isFinal ? (content || "(空応答)") : content);
+          if (inlineThinking) {
+            const combinedThinking = reasoning ? reasoning + "\n" + inlineThinking : inlineThinking;
+            thinkHtml = renderThinkingHtml(combinedThinking, !isFinal && isPartial);
+          }
+
+          contentEl.innerHTML = thinkHtml + marked.parse(main || (isFinal ? "(空応答)" : ""));
+        }
 
         await consumeSSE(
           reader,
-          (delta) => {
-            content += delta;
+          (delta, reasoningDelta) => {
+            if (reasoningDelta) reasoning += reasoningDelta;
+            if (delta) content += delta;
             // エラー時に内容を保持するためにdatasetに保存
             currentMsgDiv.dataset.partialContent = content;
-            const contentEl = currentMsgDiv.querySelector(".message-content");
-            if (contentEl) {
-              // v1.8.0: ストリーミング中も思考プロセスを抽出して表示
-              const { thinking, main, isPartial } = extractThinkingBlocks(content);
-              const thinkHtml = renderThinkingHtml(thinking, isPartial);
-              contentEl.innerHTML = thinkHtml + marked.parse(main);
-            }
+            updateStreamingUI(false);
             smartScrollToBottom();  // ★ スマートスクロール
           },
           () => {
-            // onDone: UI表示の最終化のみ行う（メッセージ保存は後続で実施）
-            const contentEl = currentMsgDiv.querySelector(".message-content");
-            if (contentEl) {
-              const { thinking, main, isPartial } = extractThinkingBlocks(content || "(空応答)");
-              const thinkHtml = renderThinkingHtml(thinking, false);
-              contentEl.innerHTML = thinkHtml + marked.parse(main || "(空応答)");
-            }
+            // onDone: UI表示の最終化
+            updateStreamingUI(true);
 
             // Copy機能用のdataset更新
             currentMsgDiv.dataset.content = content;
@@ -3716,11 +3711,6 @@ AI応答テキスト:
     // v1.8.0: reasoning_effort
     if (el.reasoningEffort) {
       el.reasoningEffort.onchange = save;
-    }
-
-    // v1.8.0: 思考プロセス表示設定
-    if (el.hideThinkingToggle) {
-      el.hideThinkingToggle.onchange = save;
     }
 
     // v1.8.0: オープニング画面表示設定
