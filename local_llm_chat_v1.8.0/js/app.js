@@ -1001,6 +1001,12 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     if (!el.modelVisibilityList) return;
 
     const allIds = Array.from(runtime.availableModels);
+    // ABC順にソート（パスプレフィックスを除いた名前で比較）
+    allIds.sort((a, b) => {
+      const nameA = a.replace(/^.*\//, "").toLowerCase();
+      const nameB = b.replace(/^.*\//, "").toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
     const visibility = loadModelVisibility();
 
     // カウント表示を更新
