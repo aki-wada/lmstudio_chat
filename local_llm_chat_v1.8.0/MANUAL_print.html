@@ -356,8 +356,6 @@
   <li><strong>比較モデル選択</strong>: 比較モードON時のみ表示、2つ目のモデルを選択</li>
   <li><strong>🆕 新しい話題</strong>: 新しい話題を開始（AIへの履歴送信をリセット、画面は保持）</li>
   <li><strong>🗑️</strong>: 会話履歴をクリア</li>
-  <li><strong>💾</strong>: 会話履歴をJSONでエクスポート</li>
-  <li><strong>📥</strong>: 会話履歴をJSONからインポート</li>
   <li><strong>❓</strong>: ヘルプモードのON/OFF（アプリの使い方をLLMに質問）</li>
   <li><strong>⚙️</strong>: 設定パネルを開く</li>
 </ul>
@@ -536,15 +534,23 @@
 
 <h3>📂 データタブ</h3>
 <p><strong>会話ログ管理:</strong></p>
+<p>会話はセッション（ログ）単位で自動保存されます。設定パネルの「📂 データ」タブで管理できます。</p>
+<table>
+  <tr><th>操作</th><th>説明</th></tr>
+  <tr><td><strong>＋ 新規チャット</strong></td><td>現在の会話を保存し、新しい空のセッションを開始</td></tr>
+  <tr><td><strong>セッション一覧</strong></td><td>過去の会話ログが一覧表示される。クリックで切り替え</td></tr>
+  <tr><td><strong>削除</strong></td><td>各セッションの「削除」ボタンで個別に削除可能</td></tr>
+</table>
 <ul>
-  <li><strong>＋ 新規チャット</strong>: 新しいセッションを作成</li>
-  <li>セッション一覧から過去の会話に切り替え可能</li>
-  <li>最大100件まで自動保存</li>
+  <li>セッションは最大 <strong>100件</strong> まで自動保存されます（超過時は古いものから削除）</li>
+  <li>セッションのタイトルは最初のメッセージから自動生成されます</li>
+  <li>ブラウザの localStorage に保存されるため、同じブラウザ・同じPCでのみ参照できます</li>
+  <li>「🗑️」（履歴クリア）ボタンで現在のセッションの内容を空にできます</li>
 </ul>
 <p><strong>データ管理:</strong></p>
 <ul>
-  <li><strong>🔄 設定をデフォルトに戻す</strong>: 設定のみリセット</li>
-  <li><strong>🗑 すべての保存データを消す</strong>: 履歴・設定・プリセットを全削除</li>
+  <li><strong>🔄 設定をデフォルトに戻す</strong>: 設定のみリセット（会話ログは保持）</li>
+  <li><strong>🗑 すべての保存データを消す</strong>: 履歴・設定・プリセット・会話ログを全削除</li>
 </ul>
 
 <hr>
