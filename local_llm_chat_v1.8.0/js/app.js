@@ -145,6 +145,7 @@
     IMAGE_MAX_BYTES: 20 * 1024 * 1024,  // 20MB
     FILE_MAX_BYTES:  2 * 1024 * 1024,   // 2MB
     PDF_MAX_BYTES:  10 * 1024 * 1024,   // 10MB
+    PDF_TEXT_MAX_CHARS: 30000,           // PDFテキスト上限（約30,000文字 ≒ ~10,000トークン）
     MAX_HISTORY_FOR_API: 6,             // system + last N-1 turns（実送信は userMessage を別途追加）※ コンテキスト長10,000のモデル用に縮小
     MAX_TEXTAREA_PX: 240,
     MIN_TEXTAREA_PX: 56,
@@ -1427,7 +1428,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
    * @param {{save?:boolean, imageData?:string|null}=} opts
    */
   function appendMessage(role, content, opts = {}) {
-    hideWelcomeScreen();
+    if (role !== "system") hideWelcomeScreen();
     const { save = true, imageData = null } = opts;
 
     const container = document.createElement("div");
@@ -2158,7 +2159,10 @@ ${APP_MANUAL_CONTENT}
             j.choices?.[0]?.delta?.content ??
             j.choices?.[0]?.text ??
             "";
-          const reasoningDelta = j.choices?.[0]?.delta?.reasoning ?? "";
+          const reasoningDelta =
+            j.choices?.[0]?.delta?.reasoning ??
+            j.choices?.[0]?.delta?.reasoning_content ??
+            "";
 
           if (delta || reasoningDelta) onDelta(delta, reasoningDelta);
         } catch {
@@ -2175,7 +2179,7 @@ ${APP_MANUAL_CONTENT}
         try {
           const j = JSON.parse(line);
           const delta = j.choices?.[0]?.delta?.content ?? j.choices?.[0]?.text ?? "";
-          const reasoningDelta = j.choices?.[0]?.delta?.reasoning ?? "";
+          const reasoningDelta = j.choices?.[0]?.delta?.reasoning ?? j.choices?.[0]?.delta?.reasoning_content ?? "";
           if (delta || reasoningDelta) onDelta(delta, reasoningDelta);
         } catch { /* incomplete JSON */ }
       }
@@ -2512,20 +2516,16 @@ ${APP_MANUAL_CONTENT}
           const contentEl = currentMsgDiv.querySelector(".message-content");
           if (!contentEl) return;
 
-          // API reasoning フィールド経由の思考プロセス
-          let thinkHtml = "";
-          if (reasoning) {
-            thinkHtml = renderThinkingHtml(reasoning, !isFinal);
+          // content が空で reasoning のみの場合、reasoning を本文として使用
+          let displayContent = content;
+          if (isFinal && !content && reasoning) {
+            displayContent = reasoning;
           }
 
-          // content 内の <think> タグも抽出（モデルが直接出力する場合）
-          const { thinking: inlineThinking, main, isPartial } = extractThinkingBlocks(isFinal ? (content || "(空応答)") : content);
-          if (inlineThinking) {
-            const combinedThinking = reasoning ? reasoning + "\n" + inlineThinking : inlineThinking;
-            thinkHtml = renderThinkingHtml(combinedThinking, !isFinal && isPartial);
-          }
+          // content 内の <think> タグを抽出（モデルが直接出力する場合）
+          const { main } = extractThinkingBlocks(isFinal ? (displayContent || "(空応答)") : displayContent);
 
-          contentEl.innerHTML = thinkHtml + marked.parse(main || (isFinal ? "(空応答)" : ""));
+          contentEl.innerHTML = marked.parse(main || (isFinal ? "(空応答)" : ""));
         }
 
         await consumeSSE(
@@ -3024,7 +3024,9 @@ AI応答テキスト:
       throw new Error("PDF.jsが読み込まれていません");
     }
 
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    // ArrayBuffer → Uint8Array に変換（PDF.js互換性向上）
+    const data = new Uint8Array(arrayBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data });
     const pdf = await loadingTask.promise;
 
     let fullText = "";
@@ -3182,7 +3184,25 @@ AI応答テキスト:
           }
           const buf = /** @type {ArrayBuffer} */ (await readArrayBuffer(file));
           const result = await extractTextFromPdf(buf);
-          data = result.text || `[PDF: ${file.name} - テキスト抽出失敗]`;
+          let pdfText = result.text || "";
+
+          if (!pdfText) {
+            data = `[PDF: ${file.name} - テキスト抽出失敗（画像PDFの可能性があります）]`;
+          } else if (pdfText.length > LIMITS.PDF_TEXT_MAX_CHARS) {
+            // テキストが上限を超える場合は先頭のみ読み込み
+            const originalLen = pdfText.length;
+            pdfText = pdfText.slice(0, LIMITS.PDF_TEXT_MAX_CHARS);
+            // 文の途中で切れないように最後の改行位置で切る
+            const lastBreak = pdfText.lastIndexOf("\n");
+            if (lastBreak > LIMITS.PDF_TEXT_MAX_CHARS * 0.8) {
+              pdfText = pdfText.slice(0, lastBreak);
+            }
+            data = pdfText + `\n\n[... 以降省略: 全${originalLen.toLocaleString()}文字中 先頭${pdfText.length.toLocaleString()}文字のみ読み込み]`;
+            notify(`⚠️ ${file.name}: テキストが大きいため先頭${(pdfText.length / 1000).toFixed(0)}K文字のみ読み込みました（全${result.pages}ページ / ${originalLen.toLocaleString()}文字）。コンテキスト不足で空応答になる場合があります。`);
+          } else {
+            data = pdfText;
+            notify(`📄 ${file.name}: ${result.pages}ページ / ${pdfText.length.toLocaleString()}文字を読み込みました`);
+          }
         } else {
           data = /** @type {string} */ (await readTextFile(file));
         }
@@ -3197,7 +3217,8 @@ AI応答テキスト:
         addedCount++;
       } catch (err) {
         console.error(`ファイル読み込みエラー (${file.name}):`, err);
-        notify(`⚠️ ${file.name} の読み込みに失敗しました`);
+        const detail = isPDF ? `（PDF処理エラー: ${err.message || err}）` : "";
+        notify(`⚠️ ${file.name} の読み込みに失敗しました${detail}`);
       }
     }
 

@@ -402,8 +402,10 @@
   <li><strong>ファイル添付</strong>: テキストファイルやPDFの内容を送信
     <ul>
       <li>対応形式: .txt, .md, .json, .csv, .xml, .html, .css, .js, .py, .pdf など</li>
-      <li>PDF: テキスト抽出してLLMに送信</li>
+      <li>PDF: テキスト抽出してLLMに送信（ページ数・文字数を通知）</li>
       <li><strong>サイズ制限: テキストファイル2MB以下、PDF10MB以下</strong></li>
+      <li><strong>PDFテキスト上限: 約30,000文字</strong>（超過時は先頭のみ読み込み、警告を表示）</li>
+      <li>画像のみのPDF（スキャンPDF等）はテキスト抽出不可（警告表示）</li>
     </ul>
   </li>
 </ul>

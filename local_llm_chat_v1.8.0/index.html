@@ -9,7 +9,13 @@
 <script src="./assets/pdf.min.js"></script>
 <script>
   if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = './assets/pdf.worker.min.js';
+    if (location.protocol === 'file:') {
+      // file:// プロトコルでは Web Worker が使えないため
+      // worker スクリプトをメインスレッドに同期読み込み（globalThis.pdfjsWorker が設定される）
+      document.write('<scr' + 'ipt src="./assets/pdf.worker.min.js"></scr' + 'ipt>');
+    } else {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './assets/pdf.worker.min.js';
+    }
   }
 </script>
 </head>
