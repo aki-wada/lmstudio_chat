@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Local LLM Chat v2.1 マニュアル</title>
+<title>Local LLM Chat v1.8.0 マニュアル</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
 
@@ -199,7 +199,7 @@
 
 <h1>Local LLM Chat マニュアル</h1>
 
-<p><strong>2026 JRC ハンズオンセミナー 配布資料</strong> (v2.1)</p>
+<p><strong>2026 JRC ハンズオンセミナー 配布資料</strong> (v1.8.0)</p>
 
 <hr>
 
@@ -302,7 +302,7 @@
       <li>ロードが完了すると、<strong>自動的にAPIが有効</strong>になります（<code>http://localhost:1234</code>）</li>
     </ul>
   </li>
-  <li><strong><code>local_llm_chat_v2.1.html</code> をブラウザで開く</strong></li>
+  <li><strong><code>index.html</code> をブラウザで開く</strong></li>
   <li><strong>モデルが自動的にドロップダウンに表示される</strong> → 会話開始！</li>
 </ol>
 
@@ -350,7 +350,7 @@
 
 <h3>ヘッダー</h3>
 <ul>
-  <li><strong>タイトル</strong>: Local LLM Chat v2.1</li>
+  <li><strong>タイトル</strong>: Local LLM Chat v1.8.0</li>
   <li><strong>モデル選択</strong>: ロードされているモデルを選択（👁️マークはVision対応）- クリック時に自動でモデル一覧を更新</li>
   <li><strong>📊 比較</strong>: モデル比較モードのON/OFF（v1.7.0新機能）</li>
   <li><strong>比較モデル選択</strong>: 比較モードON時のみ表示、2つ目のモデルを選択</li>
@@ -412,11 +412,15 @@
 
 <h3>3. Vision対応モデル表示</h3>
 <p>ドロップダウンにVision対応モデルは👁️アイコン付きで表示されます。</p>
-<p>対応キーワード: vision, llava, gemma-3, pixtral, devstral, magistral, qwen-vl, qwen2-vl, qwen3-vl, bakllava, obsidian, moondream, minicpm-v, cogvlm, glm-4v, internlm-xcomposer など</p>
+<p>対応キーワード: vision, llava, gemma-3, pixtral, devstral, magistral, qwen-vl, qwen2-vl, qwen3-vl, bakllava, obsidian, moondream, minicpm-v, cogvlm, glm-4v, internlm-xcomposer, medgemma など</p>
 
 <h3>4. プリセットプロンプト</h3>
 <p>📋 Presetボタンで定型プロンプトを挿入：</p>
 <ul>
+  <li>💻 プログラミング</li>
+  <li>✏️ 文章作成・校正</li>
+  <li>🌐 翻訳</li>
+  <li>💡 ブレインストーミング</li>
   <li>🏥 疾患解説</li>
   <li>💊 鑑別診断</li>
   <li>📄 文章要約</li>
@@ -441,7 +445,8 @@
 <p>🆕 新しい話題ボタンをクリックすると：</p>
 <ul>
   <li>AIへの会話履歴送信がリセットされます</li>
-  <li>画面上の会話は保持され、区切り線が表示されます</li>
+  <li>画面上の会話はそのまま保持され、「── 新しい話題 ──」の区切り線が表示されます</li>
+  <li>ユーザープロフィール（呼び名・職業・専門レベル等）は自動で引き継がれます</li>
   <li>話題を変えた際に前の回答が繰り返されることを防ぎます</li>
 </ul>
 <p>※ 🗑️ Clearとの違い：Clearは画面も含めてすべて削除しますが、新しい話題は画面上の会話を保持したまま、AIの文脈のみをリセットします。</p>
@@ -456,43 +461,8 @@
 <p>ヘルプモードON時は、アプリのマニュアル内容がシステムプロンプトに含まれ、LLMがマニュアルを参照して回答します。</p>
 <p>※ ヘルプモードはページをリロードするとOFFに戻ります。</p>
 
-<h3>8. 信頼度・代替候補表示（オプション）</h3>
-<p>Settingsパネルで「📊 信頼度・代替候補を表示」をONにすると、AIの応答に以下の情報が追加表示されます：</p>
-
-<h4>信頼度（Confidence）</h4>
-<ul>
-  <li>AIの回答がどれだけ確信を持っているかをパーセンテージで表示</li>
-  <li><strong>高（80%以上）</strong>: 緑色 - AIが自信を持って回答</li>
-  <li><strong>中（50-80%）</strong>: 黄色 - ある程度の確信がある</li>
-  <li><strong>低（50%未満）</strong>: 赤色 - 不確かな回答の可能性</li>
-</ul>
-
-<h4>代替候補（Alternatives）</h4>
-<ul>
-  <li>AIが各単語を選ぶ際に検討した他の候補を表示</li>
-  <li>例: 「肺炎」を選んだ箇所で「気管支炎(15%)」「COPD(7%)」なども検討していた場合に表示</li>
-  <li>鑑別診断や複数の解釈がある場合に有用</li>
-</ul>
-<p><strong>注意事項:</strong></p>
-<ul>
-  <li>この機能には <strong>LM Studio v0.3.39以降</strong> が必要です</li>
-  <li>Open Responses API（logprobs機能）を使用しています</li>
-  <li>古いバージョンのLM Studioでは情報が表示されない場合があります</li>
-</ul>
-
 <div class="new-feature">
-<h3>9. 表示モデル管理（v2.1新機能）</h3>
-<p>設定 → 詳細タブの「表示モデル管理」で、モデル選択ドロップダウンに表示するモデルを絞り込めます：</p>
-<ol>
-  <li>「🔄 モデル一覧を取得」をクリックして全モデルを読み込み</li>
-  <li>表示したいモデルにチェックを入れる（チェックを外すとドロップダウンから非表示に）</li>
-  <li>「全選択」「全解除」で一括操作も可能</li>
-</ol>
-<p>フィルター設定はlocalStorageに保存され、次回起動時にも維持されます。多数のモデルをダウンロードしている場合に、よく使うモデルだけを表示して素早く選択できます。</p>
-</div>
-
-<div class="new-feature">
-<h3>10. モデル比較機能（オプション・24GB以上推奨）</h3>
+<h3>8. モデル比較機能（オプション・24GB以上推奨）</h3>
 <p>📊 比較ボタンで2つのモデルの回答を並べて比較できます。2つのモデルを同時にロードするため、十分なメモリ（24GB以上）がある環境で使用してください。</p>
 <p><strong>使い方:</strong></p>
 <ol>
@@ -525,44 +495,53 @@
 <hr>
 
 <h2>設定項目</h2>
+<p>設定パネルは4つのタブで構成されています。</p>
 
-<h3>基本設定</h3>
+<h3>⚙️ 基本タブ</h3>
 <table>
   <tr><th>項目</th><th>説明</th><th>デフォルト</th></tr>
   <tr><td>🌙 Dark Mode</td><td>ダークモードの切替</td><td>OFF</td></tr>
-  <tr><td>🔄 モデル自動アンロード</td><td>モデル切替時に前のモデルを自動アンロード（LM Studio v0.4以降）</td><td>ON</td></tr>
-  <tr><td>🔗 Base URL</td><td>LLMサーバーのURL</td><td>http://localhost:1234/v1</td></tr>
-  <tr><td>🔑 API Key</td><td>認証キー</td><td>lmstudio</td></tr>
+  <tr><td>🧠 思考プロセスを折り畳む</td><td><code>&lt;think&gt;</code>タグ出力を折りたたみ表示</td><td>OFF</td></tr>
+  <tr><td>🔄 自動アンロード</td><td>モデル切替時に前のモデルを自動アンロード（LM Studio v0.4以降）</td><td>ON</td></tr>
+  <tr><td>送信キー</td><td>メッセージ送信のキー設定</td><td>Enter で送信</td></tr>
+  <tr><td>応答スタイル</td><td>AIの応答の詳しさ（簡潔/標準/詳細/専門的）</td><td>標準</td></tr>
   <tr><td>Temperature</td><td>創造性（0=安定、2=創造的）</td><td>0.7</td></tr>
   <tr><td>Max Tokens</td><td>最大出力トークン数</td><td>2048</td></tr>
-  <tr><td>送信キー</td><td>メッセージ送信のキー設定</td><td>Enter で送信</td></tr>
+  <tr><td>Reasoning Effort</td><td>推論モデル用の推論レベル（Low/Medium/High）</td><td>指定なし</td></tr>
+  <tr><td>🔗 Base URL</td><td>LLMサーバーのURL</td><td>http://localhost:1234/v1</td></tr>
+  <tr><td>🔑 API Key</td><td>認証キー</td><td>lmstudio</td></tr>
 </table>
 
-<h3>送信キー設定</h3>
-<table>
-  <tr><th>設定</th><th>Enter</th><th>Shift+Enter</th><th>Ctrl/Cmd+Enter</th></tr>
-  <tr><td>Enter で送信</td><td>送信</td><td>改行</td><td>-</td></tr>
-  <tr><td>Ctrl+Enter で送信</td><td>改行</td><td>改行</td><td>送信</td></tr>
-</table>
-
-<h3>応答スタイル</h3>
-<table>
-  <tr><th>スタイル</th><th>説明</th></tr>
-  <tr><td>簡潔</td><td>要点のみを短く</td></tr>
-  <tr><td>標準</td><td>バランスの取れた回答</td></tr>
-  <tr><td>詳細</td><td>背景や具体例を含む</td></tr>
-  <tr><td>専門的</td><td>技術的詳細重視</td></tr>
-</table>
-
-<h3>ユーザープロフィール</h3>
+<p><strong>👤 ユーザープロフィール（基本タブ内）:</strong></p>
 <table>
   <tr><th>項目</th><th>説明</th></tr>
-  <tr><td>専門レベル</td><td>初心者〜専門家</td></tr>
-  <tr><td>職業/専門分野</td><td>例: 放射線科医、学生</td></tr>
+  <tr><td>呼び名</td><td>AIがユーザーを呼ぶ名前（例: 田中先生）</td></tr>
+  <tr><td>専門レベル</td><td>初心者〜専門家（AIの説明レベルが変わります）</td></tr>
+  <tr><td>職業/専門</td><td>例: 放射線科医、学生</td></tr>
   <tr><td>興味・関心</td><td>例: CT画像診断、機械学習</td></tr>
 </table>
+<p>※ 「新しい話題」でリセットしてもプロフィールは自動で引き継がれます。</p>
 
-<h3>データ管理</h3>
+<h3>💬 プロンプトタブ</h3>
+<p><strong>System Promptプリセット:</strong></p>
+<table>
+  <tr><th>プリセット</th><th>説明</th></tr>
+  <tr><td>💬 汎用アシスタント</td><td>一般的な質問応答（デフォルト）</td></tr>
+  <tr><td>🩻 放射線科アシスタント</td><td>放射線画像診断の専門アシスタント</td></tr>
+</table>
+<p>ユーザー定義のプリセットも保存・切替可能です。プリセットの新規追加・内容編集・削除も可能です。</p>
+
+<h3>👁️ モデルタブ</h3>
+<p>ドロップダウンに表示するモデルを選択できます。不要なモデルを非表示にしてリストを整理できます。</p>
+
+<h3>📂 データタブ</h3>
+<p><strong>会話ログ管理:</strong></p>
+<ul>
+  <li><strong>＋ 新規チャット</strong>: 新しいセッションを作成</li>
+  <li>セッション一覧から過去の会話に切り替え可能</li>
+  <li>最大100件まで自動保存</li>
+</ul>
+<p><strong>データ管理:</strong></p>
 <ul>
   <li><strong>🔄 設定をデフォルトに戻す</strong>: 設定のみリセット</li>
   <li><strong>🗑 すべての保存データを消す</strong>: 履歴・設定・プリセットを全削除</li>
@@ -591,7 +570,7 @@
 <table>
   <tr><th>搭載RAM</th><th>システム予約</th><th>GPU上限(≈75%)</th><th>実質使用可能</th></tr>
   <tr><td><strong>16GB</strong></td><td>4-6GB</td><td>12GB</td><td><strong>10-12GB</strong></td></tr>
-  <tr><td><strong>24GB</strong></td><td>4-6GB</td><td>18GB</td><td><strong>16-18GB</strong></td></tr>
+  <tr><td><strong>24GB以上</strong></td><td>4-6GB</td><td>18-24GB</td><td><strong>16-26GB</strong></td></tr>
 </table>
 <p><strong>重要</strong>: 70%を超えるとswap発生でパフォーマンスが低下します。</p>
 
@@ -629,34 +608,39 @@
   <li><strong>複数モデル同時ロードは避ける</strong></li>
 </ul>
 
-<h3>24GB Mac の運用指針</h3>
+<h3>24GB以上 Mac の運用指針（24GB / 32GB M4 MacBook Air等）</h3>
 
 <h4>推奨モデルサイズ</h4>
 <table>
-  <tr><th>モデル</th><th>量子化</th><th>サイズ</th><th>推奨度</th></tr>
-  <tr><td><strong>7B / 8B</strong></td><td>Q4_K_M</td><td>4-5GB</td><td>⭐⭐⭐ 余裕</td></tr>
-  <tr><td>7B / 8B</td><td>Q8_0</td><td>8-9GB</td><td>⭐⭐⭐ 快適</td></tr>
-  <tr><td><strong>13B / 14B</strong></td><td>Q4_K_M</td><td>8-9GB</td><td>⭐⭐ 良好</td></tr>
-  <tr><td>13B / 14B</td><td>Q5_K_M</td><td>10-11GB</td><td>⚠️ 注意</td></tr>
-  <tr><td>27B</td><td>Q4_K_M</td><td>15-16GB</td><td>⚠️ ギリギリ</td></tr>
-  <tr><td>70B</td><td>任意</td><td>35GB+</td><td>❌ 不可</td></tr>
+  <tr><th>モデル</th><th>量子化</th><th>サイズ</th><th>24GB</th><th>32GB</th></tr>
+  <tr><td><strong>7B / 8B</strong></td><td>Q4_K_M</td><td>4-5GB</td><td>⭐⭐⭐ 余裕</td><td>⭐⭐⭐ 余裕</td></tr>
+  <tr><td>7B / 8B</td><td>Q8_0</td><td>8-9GB</td><td>⭐⭐⭐ 快適</td><td>⭐⭐⭐ 余裕</td></tr>
+  <tr><td><strong>13B / 14B</strong></td><td>Q4_K_M</td><td>8-9GB</td><td>⭐⭐ 良好</td><td>⭐⭐⭐ 余裕</td></tr>
+  <tr><td>13B / 14B</td><td>Q8_0</td><td>14-16GB</td><td>⚠️ 注意</td><td>⭐⭐ 良好</td></tr>
+  <tr><td><strong>27B</strong></td><td>Q4_K_M</td><td>15-16GB</td><td>⚠️ ギリギリ</td><td>⭐⭐ 良好</td></tr>
+  <tr><td>32B</td><td>Q4_K_M</td><td>18-20GB</td><td>❌ 不可</td><td>⚠️ 注意</td></tr>
+  <tr><td>70B</td><td>任意</td><td>35GB+</td><td>❌ 不可</td><td>❌ 不可</td></tr>
 </table>
 
 <h4>推奨設定</h4>
-<ul>
-  <li><strong>context length</strong>: 4096〜8192（最大16384）</li>
-  <li><strong>parallel</strong>: 1〜2</li>
-  <li><strong>KV cache量子化</strong>: 有効推奨</li>
-</ul>
+<table>
+  <tr><th>設定項目</th><th>24GB</th><th>32GB</th></tr>
+  <tr><td><strong>context length</strong></td><td>4096〜8192</td><td>8192〜16384</td></tr>
+  <tr><td><strong>parallel</strong></td><td>1〜2</td><td>1〜2</td></tr>
+  <tr><td><strong>KV cache量子化</strong></td><td>有効推奨</td><td>有効推奨</td></tr>
+</table>
 
 <h4>安全な組み合わせ</h4>
 <table>
-  <tr><th>モデル</th><th>context</th><th>parallel</th><th>状態</th></tr>
-  <tr><td>7B Q4</td><td>8192</td><td>2</td><td>✅ 安全</td></tr>
-  <tr><td>8B Q8</td><td>4096</td><td>2</td><td>✅ 安全</td></tr>
-  <tr><td>13B Q4</td><td>4096</td><td>1</td><td>✅ 安全</td></tr>
-  <tr><td>13B Q4</td><td>8192</td><td>1</td><td>⚠️ 注意</td></tr>
-  <tr><td>27B Q4</td><td>4096</td><td>1</td><td>⚠️ 限界</td></tr>
+  <tr><th>モデル</th><th>context</th><th>parallel</th><th>24GB</th><th>32GB</th></tr>
+  <tr><td>7B Q4</td><td>8192</td><td>2</td><td>✅ 安全</td><td>✅ 余裕</td></tr>
+  <tr><td>8B Q8</td><td>4096</td><td>2</td><td>✅ 安全</td><td>✅ 余裕</td></tr>
+  <tr><td>13B Q4</td><td>4096</td><td>1</td><td>✅ 安全</td><td>✅ 安全</td></tr>
+  <tr><td>13B Q4</td><td>8192</td><td>1</td><td>⚠️ 注意</td><td>✅ 安全</td></tr>
+  <tr><td>14B Q8</td><td>4096</td><td>1</td><td>⚠️ 注意</td><td>✅ 安全</td></tr>
+  <tr><td>27B Q4</td><td>4096</td><td>1</td><td>⚠️ 限界</td><td>✅ 安全</td></tr>
+  <tr><td>27B Q4</td><td>8192</td><td>1</td><td>❌ 不可</td><td>⚠️ 注意</td></tr>
+  <tr><td>32B Q4</td><td>4096</td><td>1</td><td>❌ 不可</td><td>⚠️ 限界</td></tr>
 </table>
 
 <h3>メモリ使用量の確認方法（Resource Consumption Widget）</h3>
@@ -694,23 +678,27 @@
 <h4>16GB Mac</h4>
 <table>
   <tr><th>モデル</th><th>サイズ</th><th>特徴</th><th>推奨度</th></tr>
+  <tr><td><strong>LFM2.5 1.2B</strong> (4-bit)</td><td>約0.8GB</td><td>超軽量・最速、Liquid AI製</td><td>⭐⭐⭐</td></tr>
   <tr><td><strong>Gemma 3 4B</strong> (4-bit)</td><td>約2.6GB</td><td>軽量・高速、Vision対応 👁️</td><td>⭐⭐⭐</td></tr>
   <tr><td><strong>Qwen 3 4B</strong> (4-bit)</td><td>約2.5GB</td><td>軽量・日本語良好</td><td>⭐⭐⭐</td></tr>
+  <tr><td><strong>MedGemma 4B</strong> (8-bit)</td><td>約1.2GB</td><td>医療特化、Vision対応 👁️🏥</td><td>⭐⭐⭐</td></tr>
   <tr><td>Qwen 3 8B (4-bit)</td><td>約4.3GB</td><td>バランス良好</td><td>⭐⭐</td></tr>
   <tr><td>Gemma 3 12B (4-bit)</td><td>約6.6GB</td><td>高品質、メモリ余裕少</td><td>⚠️</td></tr>
 </table>
-<p><strong>推奨</strong>: <code>gemma-3-4b-it-4bit</code> または <code>Qwen3-4B-4bit</code>（context: 2048〜4096）</p>
+<p><strong>推奨</strong>: <code>liquid/lfm2.5-1.2b</code>、<code>gemma-3-4b-it-4bit</code>、<code>medgemma-1.5-4b-it@8bit</code>、または <code>Qwen3-4B-4bit</code>（context: 2048〜4096）</p>
 
-<h4>24GB Mac</h4>
+<h4>24GB以上 Mac（24GB / 32GB）</h4>
 <table>
-  <tr><th>モデル</th><th>サイズ</th><th>特徴</th><th>推奨度</th></tr>
-  <tr><td><strong>Gemma 3 12B</strong> (4-bit)</td><td>約6.6GB</td><td>高品質、Vision対応 👁️</td><td>⭐⭐⭐</td></tr>
-  <tr><td><strong>Qwen 3 8B</strong> (4-bit)</td><td>約4.3GB</td><td>日本語優秀、高速</td><td>⭐⭐⭐</td></tr>
-  <tr><td><strong>gpt-oss 20B</strong> (4-bit)</td><td>約11GB</td><td>OpenAI公式、MoE高効率</td><td>⭐⭐⭐</td></tr>
-  <tr><td>Qwen 3 14B (4-bit)</td><td>約8-9GB</td><td>高性能</td><td>⭐⭐</td></tr>
-  <tr><td>Gemma 3 27B (4-bit)</td><td>約15GB</td><td>最高品質、メモリ限界</td><td>⚠️</td></tr>
+  <tr><th>モデル</th><th>サイズ</th><th>特徴</th><th>24GB</th><th>32GB</th></tr>
+  <tr><td><strong>Gemma 3 12B</strong> (4-bit)</td><td>約6.6GB</td><td>高品質、Vision対応 👁️</td><td>⭐⭐⭐</td><td>⭐⭐⭐</td></tr>
+  <tr><td><strong>Qwen 3 8B</strong> (4-bit)</td><td>約4.3GB</td><td>日本語優秀、高速</td><td>⭐⭐⭐</td><td>⭐⭐⭐</td></tr>
+  <tr><td><strong>gpt-oss 20B</strong> (4-bit)</td><td>約11GB</td><td>OpenAI公式、MoE高効率</td><td>⭐⭐⭐</td><td>⭐⭐⭐</td></tr>
+  <tr><td><strong>Qwen 3 14B</strong> (4-bit)</td><td>約8-9GB</td><td>高性能、日本語優秀</td><td>⭐⭐</td><td>⭐⭐⭐</td></tr>
+  <tr><td><strong>Gemma 3 27B</strong> (4-bit)</td><td>約15GB</td><td>最高品質、Vision対応 👁️</td><td>⚠️</td><td>⭐⭐⭐</td></tr>
+  <tr><td>Qwen 3 32B (4-bit)</td><td>約18GB</td><td>最高性能</td><td>❌</td><td>⚠️</td></tr>
 </table>
-<p><strong>推奨</strong>: <code>gemma-3-12b-it-4bit</code>、<code>Qwen3-8B-4bit</code>、または <code>gpt-oss-20b-4bit</code>（context: 4096〜8192）</p>
+<p><strong>24GB推奨</strong>: <code>gemma-3-12b-it-4bit</code>、<code>Qwen3-8B-4bit</code>、または <code>gpt-oss-20b-4bit</code>（context: 4096〜8192）</p>
+<p><strong>32GB推奨</strong>: <code>gemma-3-27b-it-4bit</code>、<code>Qwen3-14B-4bit</code>、または <code>gpt-oss-20b-4bit</code>（context: 8192〜16384）</p>
 
 <div class="note">
 <p><strong>gpt-oss 20Bとは</strong>: OpenAI初のオープンソースモデル（Apache 2.0）。21Bパラメータ中3.6Bのみ活性化するMoE構造で、メモリ効率が非常に高い。</p>
@@ -718,11 +706,12 @@
 
 <h3>モデル選択ガイド</h3>
 <table>
-  <tr><th>用途</th><th>16GB Mac</th><th>24GB Mac</th></tr>
-  <tr><td><strong>画像認識（Vision）</strong></td><td>Gemma 3 4B 👁️ / Qwen 3 VL 3B 👁️</td><td>Gemma 3 12B 👁️ / Qwen 3 VL 8B 👁️</td></tr>
-  <tr><td><strong>日本語重視</strong></td><td>Qwen 3 4B / 8B</td><td>Qwen 3 8B / 14B</td></tr>
-  <tr><td><strong>軽量・高速</strong></td><td>Gemma 3 4B</td><td>Qwen 3 8B</td></tr>
-  <tr><td><strong>高品質回答</strong></td><td>Qwen 3 8B</td><td>gpt-oss 20B / Gemma 3 12B</td></tr>
+  <tr><th>用途</th><th>16GB Mac</th><th>24GB以上 Mac</th></tr>
+  <tr><td><strong>画像認識（Vision）</strong></td><td>Gemma 3 4B 👁️ / MedGemma 4B 👁️🏥 / Qwen 3 VL 3B 👁️</td><td>Gemma 3 12B〜27B 👁️ / Qwen 3 VL 8B 👁️</td></tr>
+  <tr><td><strong>医療特化</strong></td><td>MedGemma 4B 👁️🏥</td><td>MedGemma 4B 👁️🏥</td></tr>
+  <tr><td><strong>日本語重視</strong></td><td>Qwen 3 4B / 8B</td><td>Qwen 3 8B / 14B（32GB: 14B / 32B）</td></tr>
+  <tr><td><strong>軽量・高速</strong></td><td>LFM2.5 1.2B / Gemma 3 4B</td><td>Qwen 3 8B / Gemma 3 12B</td></tr>
+  <tr><td><strong>高品質回答</strong></td><td>Qwen 3 8B</td><td>gpt-oss 20B / Gemma 3 12B〜27B</td></tr>
   <tr><td><strong>OpenAI互換</strong></td><td>-</td><td>gpt-oss 20B</td></tr>
 </table>
 
@@ -738,6 +727,7 @@
 <table>
   <tr><th>モデル</th><th>サイズ目安</th><th>推奨RAM</th><th>特徴</th></tr>
   <tr><td><strong>Gemma 3 4B</strong> 👁️</td><td>~2.4GB</td><td>16GB</td><td>軽量・高速、画像+テキスト</td></tr>
+  <tr><td><strong>MedGemma 4B</strong> (8-bit) 👁️🏥</td><td>~1.2GB</td><td>16GB</td><td>医療特化、画像+テキスト</td></tr>
   <tr><td><strong>Qwen3-VL 2B</strong> 👁️</td><td>~3GB</td><td>16GB</td><td>最小のVLモデル</td></tr>
   <tr><td><strong>Qwen3-VL 4B</strong> 👁️</td><td>~3GB</td><td>16GB</td><td>軽量VL、バランス良好</td></tr>
   <tr><td><strong>Gemma 3 12B</strong> 👁️</td><td>~6.6GB</td><td>24GB</td><td>高品質、推奨 ⭐</td></tr>
@@ -749,18 +739,51 @@
 <p><strong>ハンズオン推奨</strong>: 16GB Mac → Gemma 3 4B または Qwen3-VL 4B、24GB Mac → Gemma 3 12B または Qwen3-VL 8B</p>
 
 <h3>LM Studioでのダウンロード方法</h3>
+
+<h4>Mac（Apple Silicon）— MLX形式</h4>
 <ol>
   <li>LM Studio → 探索（⌘⇧M）</li>
   <li>検索バー右側で <strong>「MLX」にチェック</strong> ✓</li>
   <li><code>gemma 3</code> または <code>qwen 3</code> で検索</li>
   <li><code>4bit</code> バージョンを選択してダウンロード</li>
 </ol>
+<div class="note">
+<p>MLXはApple Silicon向けに最適化されたフォーマットで、GGUFより高速で効率的です。</p>
+</div>
+
+<h4>Windows / Linux — GGUF形式</h4>
+<ol>
+  <li>LM Studio → 探索（Ctrl+Shift+M）</li>
+  <li>検索バー右側で <strong>「GGUF」にチェック</strong> ✓</li>
+  <li><code>gemma 3</code> または <code>qwen 3</code> で検索</li>
+  <li><code>Q4_K_M</code> 量子化バージョンを選択してダウンロード</li>
+</ol>
+<div class="note">
+<p>GGUFはクロスプラットフォーム対応のフォーマットです。量子化レベルの目安：</p>
+<ul>
+  <li><strong>Q4_K_M</strong>: サイズ小・速度速（推奨）</li>
+  <li><strong>Q5_K_M</strong>: バランス型</li>
+  <li><strong>Q8_0</strong>: 高品質・サイズ大</li>
+</ul>
+</div>
+
+<p><strong>Windows での推奨モデル（GGUF Q4_K_M）:</strong></p>
+<table>
+  <tr><th>VRAM</th><th>推奨モデル</th><th>context上限</th></tr>
+  <tr><td><strong>8GB</strong></td><td>Gemma 3 4B / Qwen 3 4B / LFM2.5 1.2B</td><td>4096</td></tr>
+  <tr><td><strong>12GB</strong></td><td>Qwen 3 8B / Gemma 3 12B</td><td>4096〜8192</td></tr>
+  <tr><td><strong>16GB+</strong></td><td>Gemma 3 12B / gpt-oss 20B / Qwen 3 14B</td><td>8192</td></tr>
+</table>
+<div class="note">
+<p><strong>注意</strong>: WindowsではGPU VRAM（グラフィックメモリ）がボトルネックになります。NVIDIA GPUの場合、<code>nvidia-smi</code> でVRAMを確認してください。VRAMが不足する場合はCPUオフロードが発生し速度が低下します。</p>
+</div>
 
 <h3>まとめ</h3>
 <table>
   <tr><th>RAM</th><th>推奨モデル（MLX 4-bit）</th><th>context上限</th></tr>
   <tr><td><strong>16GB</strong></td><td>Gemma 3 4B / Qwen 3 4B</td><td>4096</td></tr>
   <tr><td><strong>24GB</strong></td><td>Gemma 3 12B / Qwen 3 8B / gpt-oss 20B</td><td>8192</td></tr>
+  <tr><td><strong>32GB</strong></td><td>上記 + Gemma 3 27B / Qwen 3 14B</td><td>16384</td></tr>
 </table>
 
 <hr>
@@ -825,8 +848,6 @@
   <li><code>localLLMChat_presets</code>: カスタムプリセットの内容</li>
   <li><code>localLLMChat_presetLabels</code>: カスタムプリセットのラベル</li>
   <li><code>localLLMChat_draft</code>: 入力中の下書き（自動保存）</li>
-  <li><code>localLLMChat_systemPromptPresets</code>: System Promptプリセット</li>
-  <li><code>localLLMChat_modelFilter</code>: 表示モデルフィルター設定</li>
 </ul>
 <p>データはブラウザを閉じても保持されます。プライベートモード/シークレットモードでは保存されません。</p>
 
@@ -913,34 +934,42 @@
   <tr><td>Anthropic互換API</td><td>なし</td><td><strong>0.4.1で追加</strong></td></tr>
   <tr><td>headless運用</td><td>困難</td><td><strong>llmsterで対応</strong></td></tr>
 </table>
-<p><strong>推奨</strong>: Local LLM Chat v2.1 の全機能を使用するには <strong>LM Studio v0.4.0以降</strong> を使用してください。</p>
+<p><strong>推奨</strong>: Local LLM Chat v1.8.0 の全機能を使用するには <strong>LM Studio v0.4.0以降</strong> を使用してください。</p>
 
 <hr>
 
 <h2>バージョン履歴</h2>
 
-<h3>v2.1 (2026-02-17)</h3>
+<h3>v1.8.0 (2026-02-25)</h3>
 <ul>
-  <li><strong>新機能</strong>: 表示モデル管理（モデルフィルター）
+  <li><strong>新機能</strong>
     <ul>
-      <li>設定 → 詳細タブで、ドロップダウンに表示するモデルを選択可能</li>
-      <li>多数のモデルから必要なものだけを表示してすばやく選択</li>
+      <li>🧠 <strong>reasoning_effort パラメータ</strong>: モデルの推論レベル（low / medium / high）を設定可能</li>
+      <li>💭 <strong>Thinking表示</strong>: <code>&lt;think&gt;</code>タグによる思考プロセスの表示/折りたたみ切替</li>
+      <li>⌨️ <strong>キーボードショートカット一覧</strong>: Ctrl+/ でショートカットモーダルを表示</li>
+      <li>👁️ <strong>モデル表示フィルター</strong>: ドロップダウンに表示するモデルを選択可能</li>
+      <li>📂 <strong>セッション管理</strong>: 複数の会話セッションを保存・切り替え</li>
+      <li>👤 <strong>ユーザー呼び名設定</strong>: AIがユーザーを呼ぶ名前を設定可能</li>
+      <li>💬 <strong>System Promptプリセット</strong>: 汎用アシスタント / 放射線科アシスタントを切替</li>
     </ul>
   </li>
-  <li><strong>デザイン更新</strong>: グラスモーフィズムUI（青ベース、フロストガラス効果、SF Pro Textフォント）</li>
-  <li>v2.0の全機能を継承</li>
-</ul>
-
-<h3>v2.0 (2026-02-16)</h3>
-<ul>
-  <li><strong>UIフルリニューアル</strong>: ChatGPT/Claude風のモダンUI
+  <li><strong>UI改善</strong>
     <ul>
-      <li>フローティングカード型入力エリア、コードブロック改善</li>
-      <li>ストリーミングアニメーション、メッセージアクション改善</li>
+      <li>設定パネルを4タブ構成に整理（基本 / プロンプト / モデル / データ）</li>
+      <li>「新しい話題」ボタンの動作変更: 画面を保持したまま区切り線を表示、ユーザー情報を自動引き継ぎ</li>
+      <li>デフォルト System Prompt を汎用的な内容に変更</li>
+      <li>プリセットにプログラミング・文章作成・翻訳・ブレインストーミングを追加</li>
+      <li>エントリーファイル名を <code>index.html</code> に統一</li>
     </ul>
   </li>
-  <li><strong>ヘッダー整理</strong>: エクスポート/インポート/比較/ヘルプを「•••」メニューに集約</li>
-  <li>v1.7.3の全機能を継承</li>
+  <li><strong>改善</strong>
+    <ul>
+      <li>MedGemma の <code>&lt;medgemma_thinking&gt;</code> タグに対応</li>
+      <li>Vision対応モデル判定に medgemma を追加</li>
+      <li>推奨モデルに LFM2.5 1.2B、MedGemma 4B を追加</li>
+      <li>Windows (GGUF) ダウンロード手順を追加</li>
+    </ul>
+  </li>
 </ul>
 
 <h3>v1.7.3 (2026-02-09)</h3>
@@ -1017,8 +1046,7 @@
 
 <h3>v1.6.7 (2026-01-20)</h3>
 <ul>
-  <li><strong>新機能</strong>: 信頼度表示、代替候補表示、会話履歴インポート</li>
-  <li><strong>設定追加</strong>: 「📊 信頼度・代替候補を表示」トグル</li>
+  <li><strong>新機能</strong>: 会話履歴インポート</li>
 </ul>
 
 <h3>v1.6.6 (2026-01-19)</h3>
