@@ -206,6 +206,7 @@
     autoUnload: true,     // v1.7.3: モデル切替時に前のモデルを自動アンロード
     reasoningEffort: "",  // v1.8.0: reasoning_effort パラメータ（"", "low", "medium", "high"）
     hideThinking: false,  // v1.8.0: 思考プロセスを折りたたむ
+    showWelcome: true,    // v1.8.0: 起動時にオープニング画面を表示
   });
 
   // ---------------------------------------------------------------------------
@@ -248,6 +249,7 @@
     autoUnloadToggle: document.getElementById("autoUnloadToggle"),      // v1.7.3
     reasoningEffort: document.getElementById("reasoningEffort"),        // v1.8.0
     hideThinkingToggle: document.getElementById("hideThinkingToggle"), // v1.8.0
+    showWelcomeToggle: document.getElementById("showWelcomeToggle"),   // v1.8.0
 
     // v1.7.2: 医学用語チェックモーダル
     termCheckModal: document.getElementById("termCheckModal"),
@@ -716,6 +718,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       autoUnload: Boolean(s.autoUnload),        // v1.7.3
       reasoningEffort: s.reasoningEffort || "",  // v1.8.0
       hideThinking: Boolean(s.hideThinking),     // v1.8.0
+      showWelcome: s.showWelcome !== false,        // v1.8.0: デフォルトtrue
     });
   }
 
@@ -757,6 +760,11 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
     if (el.hideThinkingToggle) {
       el.hideThinkingToggle.checked = Boolean(settings.hideThinking);
     }
+
+    // v1.8.0: オープニング画面表示設定
+    if (el.showWelcomeToggle) {
+      el.showWelcomeToggle.checked = settings.showWelcome !== false;
+    }
   }
 
   /** UI → settingsへ反映し保存 */
@@ -778,6 +786,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
       autoUnload: el.autoUnloadToggle?.checked || false,       // v1.7.3
       reasoningEffort: el.reasoningEffort?.value || "",         // v1.8.0
       hideThinking: el.hideThinkingToggle?.checked || false,   // v1.8.0
+      showWelcome: el.showWelcomeToggle?.checked !== false,    // v1.8.0
     };
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }
@@ -899,6 +908,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
 
     // UI更新
     el.chat.innerHTML = "";
+    showWelcomeScreen();
     applySettingsToUI();
     renderPresetUI();
     loadPresetToEditor();
@@ -1256,6 +1266,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
 
     if (!silent) {
       el.chat.innerHTML = "";
+      showWelcomeScreen();
       renderSessionList();
       notify("📂 新しいセッションを作成しました");
     }
@@ -1282,7 +1293,11 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
 
     // UI更新: チャットを再描画
     el.chat.innerHTML = "";
-    messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null }));
+    if (messages.length === 0) {
+      showWelcomeScreen();
+    } else {
+      messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null }));
+    }
     renderSessionList();
   }
 
@@ -1310,6 +1325,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
         // セッションが全て削除された場合は新規作成
         createNewSession(true);
         el.chat.innerHTML = "";
+        showWelcomeScreen();
       }
     }
 
@@ -1383,6 +1399,50 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
   // Chat UI
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // v1.8.0: Welcome Screen
+  // ---------------------------------------------------------------------------
+
+  function showWelcomeScreen() {
+    // 設定で非表示の場合はスキップ
+    if (settings && settings.showWelcome === false) return;
+    // 既に表示中なら何もしない
+    if (el.chat.querySelector(".welcome-screen")) return;
+
+    const welcome = document.createElement("div");
+    welcome.className = "welcome-screen";
+    welcome.innerHTML = `
+      <div class="welcome-logo">💬</div>
+      <h2 class="welcome-title">Local LLM Chat</h2>
+      <p class="welcome-version">v1.8.0</p>
+      <p class="welcome-description">ローカルLLMとプライベートに対話できるチャットアプリ</p>
+      <div class="welcome-tips">
+        <div class="welcome-tip">
+          <span class="welcome-tip-icon">🤖</span>
+          <span class="welcome-tip-text"><strong>モデル選択</strong>上部のドロップダウンからモデルを選択</span>
+        </div>
+        <div class="welcome-tip">
+          <span class="welcome-tip-icon">📎</span>
+          <span class="welcome-tip-text"><strong>ファイル添付</strong>画像・PDF・テキストを添付可能</span>
+        </div>
+        <div class="welcome-tip">
+          <span class="welcome-tip-icon">⚙️</span>
+          <span class="welcome-tip-text"><strong>設定カスタマイズ</strong>右上の⚙️で応答スタイルやプロンプトを調整</span>
+        </div>
+        <div class="welcome-tip">
+          <span class="welcome-tip-icon">⌨️</span>
+          <span class="welcome-tip-text"><strong>ショートカット</strong>Ctrl+/ でキーボードショートカット一覧</span>
+        </div>
+      </div>
+    `;
+    el.chat.appendChild(welcome);
+  }
+
+  function hideWelcomeScreen() {
+    const welcome = el.chat.querySelector(".welcome-screen");
+    if (welcome) welcome.remove();
+  }
+
   /**
    * チャットにメッセージを描画し、必要なら履歴へ保存する
    * @param {Role} role
@@ -1390,6 +1450,7 @@ A: 「新しい話題」は画面を保持したままAIの文脈のみリセッ
    * @param {{save?:boolean, imageData?:string|null}=} opts
    */
   function appendMessage(role, content, opts = {}) {
+    hideWelcomeScreen();
     const { save = true, imageData = null } = opts;
 
     const container = document.createElement("div");
@@ -2873,10 +2934,13 @@ AI応答テキスト:
 
   function clearHistory() {
     if (!confirm("履歴をすべて削除しますか？")) return;
-    localStorage.removeItem(STORAGE_KEYS.HISTORY);
     messages = [];
     topicStartIndex = 0;
+    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(messages));
+    // セッション側の履歴も同期
+    syncCurrentSession();
     el.chat.innerHTML = "";
+    showWelcomeScreen();
     notify("🗑 会話履歴を削除しました。");
   }
 
@@ -3659,6 +3723,11 @@ AI応答テキスト:
       el.hideThinkingToggle.onchange = save;
     }
 
+    // v1.8.0: オープニング画面表示設定
+    if (el.showWelcomeToggle) {
+      el.showWelcomeToggle.onchange = save;
+    }
+
     // v1.7.2: System Promptプリセット
     if (el.systemPromptPresetSelect) {
       el.systemPromptPresetSelect.onchange = () => {
@@ -4097,6 +4166,11 @@ AI応答テキスト:
     loadSessions();
 
     renderHistoryFromStorage();
+
+    // v1.8.0: メッセージが空ならウェルカム画面を表示
+    if (messages.length === 0) {
+      showWelcomeScreen();
+    }
 
     // v1.8.0: セッションリストを描画
     renderSessionList();

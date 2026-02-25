@@ -1030,3 +1030,132 @@ body.dark-mode #modelVisibilityList {
 body.dark-mode #modelVisibilityList label:hover {
   background: #3a3a3a;
 }
+
+/* ========================================
+   v1.8.0: Welcome Screen
+   ======================================== */
+.welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  text-align: center;
+  padding: 40px 20px;
+  animation: welcomeFadeIn 0.6s ease-out;
+}
+
+@keyframes welcomeFadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.welcome-logo {
+  font-size: 3rem;
+  margin-bottom: 8px;
+}
+
+.welcome-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+
+.welcome-version {
+  font-size: 0.8rem;
+  color: #999;
+  margin: 0 0 20px 0;
+}
+
+.welcome-description {
+  font-size: 0.95rem;
+  color: #666;
+  margin: 0 0 28px 0;
+  line-height: 1.5;
+}
+
+.welcome-tips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.welcome-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f5f7fa;
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.welcome-tip:hover {
+  background: #edf0f5;
+}
+
+.welcome-tip-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.welcome-tip-text {
+  font-size: 0.82rem;
+  color: #555;
+  line-height: 1.4;
+}
+
+.welcome-tip-text strong {
+  display: block;
+  color: #333;
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+/* Dark mode */
+body.dark-mode .welcome-title {
+  color: #e0e0e0;
+}
+
+body.dark-mode .welcome-version {
+  color: #777;
+}
+
+body.dark-mode .welcome-description {
+  color: #aaa;
+}
+
+body.dark-mode .welcome-tip {
+  background: #2a2a2a;
+}
+
+body.dark-mode .welcome-tip:hover {
+  background: #333;
+}
+
+body.dark-mode .welcome-tip-text {
+  color: #bbb;
+}
+
+body.dark-mode .welcome-tip-text strong {
+  color: #e0e0e0;
+}
+
+/* Responsive: stack tips vertically on narrow screens */
+@media (max-width: 500px) {
+  .welcome-tips {
+    grid-template-columns: 1fr;
+  }
+  .welcome-logo {
+    font-size: 2.5rem;
+  }
+  .welcome-title {
+    font-size: 1.2rem;
+  }
+}
