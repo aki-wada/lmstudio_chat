@@ -129,6 +129,31 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* === Header Action Buttons === */
+.btn-new-topic {
+  background: #fff;
+  color: #17a2b8;
+  border: 2px solid #17a2b8;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.btn-new-topic:hover {
+  background: #17a2b8;
+  color: #fff;
+}
+
+.btn-clear {
+  background: #fff;
+  color: #dc3545;
+  border: 2px solid #dc3545;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.btn-clear:hover {
+  background: #dc3545;
+  color: #fff;
+}
+
 /* === Form Elements === */
 input[type="text"] {
   padding: 6px 8px;
