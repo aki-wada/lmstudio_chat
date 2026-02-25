@@ -933,6 +933,22 @@ body.dark-mode .session-item-actions button:hover {
 /* ========================================
    v1.8.0: Keyboard Shortcuts Modal
    ======================================== */
+.shortcuts-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.shortcuts-title {
+  margin: 0 0 16px;
+  color: #333;
+}
+
 .shortcuts-table {
   width: 100%;
   border-collapse: collapse;
@@ -961,6 +977,19 @@ body.dark-mode .session-item-actions button:hover {
   font-size: 0.85em;
   border: 1px solid #ccc;
   font-family: system-ui, sans-serif;
+}
+
+body.dark-mode .shortcuts-content {
+  background: #2d2d2d;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+}
+
+body.dark-mode .shortcuts-title {
+  color: #e0e0e0;
+}
+
+body.dark-mode .shortcuts-table td {
+  color: #ccc;
 }
 
 body.dark-mode .shortcuts-table tr {
