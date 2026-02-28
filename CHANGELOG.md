@@ -11,6 +11,40 @@ All notable changes to Local LLM Chat will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0b] - 2026-02-28
+
+### Fixed
+- **メッセージ操作の信頼性向上（履歴破損防止）**: 各メッセージに永続ID（`generateMsgId()`）を付与し、削除・編集・再生成が `role + content` の曖昧一致ではなくIDで確実に対象を特定するよう改善
+  - 既存の保存データはロード時に自動でID付与（後方互換あり）
+  - ストリーミング送信・比較モード・セッション切替すべてでID伝搬
+- **再生成ボタンのセレクタ不一致修正**: `.user-message` を検索していたが実際のクラスは `.message.user` であり、常にフォールバック経路に入っていた問題を修正
+- **autoUnload デフォルト値の逆転修正**: `Boolean(s.autoUnload)` では未設定時に `false` になるため、`s.autoUnload !== false` に変更（`showWelcome` と同パターン）
+- **セッション一覧のスタイル適用漏れ修正**: JSが出力する `session-card` / `session-active` とCSSの `session-item` / `is-active` が不一致だった問題を修正（CSSをJS側に統一）
+
+---
+
+## [Presentation] - 2026-02-28
+
+### Changed
+- **JRC2026発表資料をv1.8.0に更新** - `Presentation_in_JRC2026/` 内の資料を最新版に合わせて修正
+  - `PRESENTATION_OUTLINE.md`: バージョン表記、セットアップ手順、画面構成、設定、データ安全性、新機能スライドを更新
+  - `talk.md`: セットアップ手順（5ステップ・CORS必要）、メイン画面説明、データ安全性の台本を更新
+  - セットアップ: LM Studio開発者タブでサーバー起動＋CORS有効化が必要な旨を明記
+  - ファイル名: `index.html` に統一
+  - 新機能反映: ウェルカムスクリーン、セッション管理、モデルフィルター、Reasoning Effort、キーボードショートカット一覧、System Promptプリセット、モデル比較
+  - データ保存: IndexedDB → localStorage に修正
+
+---
+
+## [1.8.0a] - 2026-02-26
+
+### Changed
+- **Vision モデル判別の改善**: `isVisionModel()` が LM Studio ネイティブAPI の `capabilities.vision` を優先参照するよう改善。レガシーAPI時は従来のキーワードマッチにフォールバック
+- **`capabilities` 保存**: `runtime.modelDetails` に `capabilities` フィールドを追加し、ネイティブAPI情報を保持
+- **Qwen3.5 対応**: `VISION_KEYWORDS` に `"qwen3.5"` を追加（ネイティブマルチモーダルモデル）
+
+---
+
 ## [2.1] - 2026-02-17
 
 ### Added

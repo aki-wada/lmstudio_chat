@@ -162,6 +162,7 @@
     "pixtral",      // Mistral Pixtral
     "devstral",     // Mistral Devstral (vision)
     "magistral",    // Mistral Magistral (vision)
+    "qwen3.5",      // Qwen3.5 (native multimodal)
     "qwen3-vl",     // Qwen3-VL
     "qwen2-vl",     // Qwen2-VL
     "qwen-vl",      // Qwen-VL
@@ -601,6 +602,11 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
   // Utilities
   // ---------------------------------------------------------------------------
 
+  /** メッセージ用の一意なIDを生成 */
+  function generateMsgId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+  }
+
   /** @param {string} raw */
   function trimTrailingSlashes(raw) {
     return String(raw || "").replace(/\/+$/, "");
@@ -628,6 +634,11 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
    * @returns {boolean}
    */
   function isVisionModel(modelId) {
+    // LM Studio ネイティブAPI: capabilities.vision で正確に判別
+    const details = runtime.modelDetails.get(modelId);
+    if (details?.capabilities?.vision === true) return true;
+    if (details?.capabilities?.vision === false) return false;
+    // フォールバック: キーワードマッチ（レガシーAPI時）
     const lower = String(modelId).toLowerCase();
     return VISION_KEYWORDS.some(k => lower.includes(k));
   }
@@ -705,7 +716,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
       userProfession: s.userProfession || DEFAULT_SETTINGS.userProfession,
       userInterests: s.userInterests || DEFAULT_SETTINGS.userInterests,
       darkMode: Boolean(s.darkMode),
-      autoUnload: Boolean(s.autoUnload),        // v1.7.3
+      autoUnload: s.autoUnload !== false,        // v1.7.3: デフォルトtrue
       reasoningEffort: s.reasoningEffort || "",  // v1.8.0
       showWelcome: s.showWelcome !== false,        // v1.8.0: デフォルトtrue
     });
@@ -777,7 +788,10 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
   /** @returns {StoredMessage[]} */
   function loadHistory() {
     const raw = localStorage.getItem(STORAGE_KEYS.HISTORY) || "[]";
-    return safeJSONParse(raw, []);
+    const arr = safeJSONParse(raw, []);
+    // 後方互換: 既存メッセージにIDがなければ付与
+    arr.forEach(m => { if (!m.id) m.id = generateMsgId(); });
+    return arr;
   }
 
   /**
@@ -1186,10 +1200,11 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
       }
     }
 
-    // 現在のセッションの履歴をロード
+    // 現在のセッションの履歴をロード（後方互換: IDがないメッセージにID付与）
     const current = sessions.find(s => s.id === currentSessionId);
     if (current) {
       messages = current.history || [];
+      messages.forEach(m => { if (!m.id) m.id = generateMsgId(); });
       localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(messages));
     }
   }
@@ -1271,6 +1286,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
 
     currentSessionId = sessionId;
     messages = target.history ? [...target.history] : [];
+    messages.forEach(m => { if (!m.id) m.id = generateMsgId(); });
     topicStartIndex = 0;
     localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(messages));
     persistSessions();
@@ -1280,7 +1296,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     if (messages.length === 0) {
       showWelcomeScreen();
     } else {
-      messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null }));
+      messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, msgId: m.id }));
     }
     renderSessionList();
   }
@@ -1304,7 +1320,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
 
         // UI更新
         el.chat.innerHTML = "";
-        messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null }));
+        messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, msgId: m.id }));
       } else {
         // セッションが全て削除された場合は新規作成
         createNewSession(true);
@@ -1435,12 +1451,15 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
    */
   function appendMessage(role, content, opts = {}) {
     if (role !== "system") hideWelcomeScreen();
-    const { save = true, imageData = null } = opts;
+    const { save = true, imageData = null, msgId = null } = opts;
+
+    const id = msgId || generateMsgId();
 
     const container = document.createElement("div");
     container.classList.add("message", role);
 
-    // Copy/Regenerate 用にメッセージ本文を埋め込み
+    // メッセージID・本文を埋め込み
+    container.dataset.msgId = id;
     container.dataset.content = content;
     if (imageData) container.dataset.imageData = imageData;
 
@@ -1473,9 +1492,11 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     scrollToBottom();
 
     if (save) {
-      messages.push({ role, content, imageData: imageData || undefined });
+      messages.push({ id, role, content, imageData: imageData || undefined });
       persistHistory();
     }
+
+    return id;
   }
 
   /**
@@ -1499,8 +1520,10 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     deleteBtn.classList.add("msg-btn");
     deleteBtn.textContent = "🗑 Delete";
     deleteBtn.onclick = () => {
-      const msgContent = msgDiv.dataset.content || "";
-      const idx = messages.findIndex(m => m.role === role && m.content === msgContent);
+      const msgId = msgDiv.dataset.msgId;
+      const idx = msgId
+        ? messages.findIndex(m => m.id === msgId)
+        : messages.findIndex(m => m.role === role && m.content === (msgDiv.dataset.content || ""));
       if (idx !== -1) {
         messages.splice(idx, 1);
         persistHistory();
@@ -1555,18 +1578,23 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
    */
   function editUserMessage(msgDiv) {
     const msgContent = msgDiv.dataset.content || "";
+    const msgId = msgDiv.dataset.msgId;
 
     // 確認ダイアログ
     if (!confirm("このメッセージを編集しますか？\n\n※ このメッセージ以降の会話は削除されます。")) {
       return;
     }
 
-    // メッセージのインデックスを探す（後ろから検索して最も近いものを見つける）
-    let idx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user" && messages[i].content === msgContent) {
-        idx = i;
-        break;
+    // メッセージのインデックスをIDで探す（フォールバック: role+content）
+    let idx = msgId
+      ? messages.findIndex(m => m.id === msgId)
+      : -1;
+    if (idx === -1) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user" && messages[i].content === msgContent) {
+          idx = i;
+          break;
+        }
       }
     }
     if (idx === -1) {
@@ -1603,10 +1631,12 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
    * @param {HTMLDivElement} msgDiv
    */
   function regenerateLastAssistant(msgDiv) {
-    const msgContent = msgDiv.dataset.content || "";
+    const assistantMsgId = msgDiv.dataset.msgId;
 
-    // アシスタントメッセージを履歴から削除（存在する場合）
-    const idx = messages.findIndex(m => m.role === "assistant" && m.content === msgContent);
+    // アシスタントメッセージを履歴から削除（IDで検索、フォールバック: role+content）
+    const idx = assistantMsgId
+      ? messages.findIndex(m => m.id === assistantMsgId)
+      : messages.findIndex(m => m.role === "assistant" && m.content === (msgDiv.dataset.content || ""));
     if (idx !== -1) {
       messages.splice(idx, 1);
       persistHistory();
@@ -1616,7 +1646,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     let lastUserDiv = null;
     let prevSibling = msgDiv.previousElementSibling;
     while (prevSibling) {
-      if (prevSibling.classList.contains("user-message")) {
+      if (prevSibling.classList.contains("message") && prevSibling.classList.contains("user")) {
         lastUserDiv = prevSibling;
         break;
       }
@@ -1626,10 +1656,12 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     // アシスタントメッセージをUIから削除
     msgDiv.remove();
 
-    // ユーザーメッセージのコンテンツを取得
+    // ユーザーメッセージのコンテンツとIDを取得
     let userContent = "";
+    let userMsgId = "";
     if (lastUserDiv) {
       userContent = lastUserDiv.dataset.content || "";
+      userMsgId = lastUserDiv.dataset.msgId || "";
     }
 
     // UI上のユーザーメッセージがない場合、履歴から探す
@@ -1637,6 +1669,7 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === "user") {
           userContent = messages[i].content;
+          userMsgId = messages[i].id || "";
           break;
         }
       }
@@ -1647,8 +1680,10 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
       return;
     }
 
-    // 履歴からユーザーメッセージを削除（再送信時に重複しないよう）
-    const userIdx = messages.findIndex(m => m.role === "user" && m.content === userContent);
+    // 履歴からユーザーメッセージを削除（IDで検索、フォールバック: role+content）
+    const userIdx = userMsgId
+      ? messages.findIndex(m => m.id === userMsgId)
+      : messages.findIndex(m => m.role === "user" && m.content === userContent);
     if (userIdx !== -1) {
       messages.splice(userIdx, 1);
       persistHistory();
@@ -1658,8 +1693,8 @@ A: 「話題リセット」は画面を保持したままAIの記憶のみリセ
     if (lastUserDiv) {
       lastUserDiv.remove();
     } else {
-      // 履歴から見つけた場合は最後のuser-messageを削除
-      const userDivs = el.chat.querySelectorAll(".user-message");
+      // 履歴から見つけた場合は最後のユーザーメッセージを削除
+      const userDivs = el.chat.querySelectorAll(".message.user");
       if (userDivs.length > 0) {
         userDivs[userDivs.length - 1].remove();
       }
@@ -1985,6 +2020,7 @@ ${APP_MANUAL_CONTENT}
             state: model.state || MODEL_STATE.NOT_LOADED,
             quantization: model.quantization || null,
             max_context_length: model.max_context_length || null,
+            capabilities: model.capabilities || null,
           });
           runtime.availableModels.add(model.id);
         }
@@ -2229,8 +2265,12 @@ ${APP_MANUAL_CONTENT}
 
     const firstImageData = imageAttachments.length > 0 ? imageAttachments[0].data : null;
 
+    // メッセージIDを事前生成
+    const userMsgId = generateMsgId();
+    const assistantMsgId = generateMsgId();
+
     // ユーザーメッセージを表示
-    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData });
+    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData, msgId: userMsgId });
     const userMsgDiv = /** @type {HTMLDivElement} */ (el.chat.lastChild);
     if (userMsgDiv) userMsgDiv.dataset.content = text;
 
@@ -2250,7 +2290,7 @@ ${APP_MANUAL_CONTENT}
       userMessage = { role: "user", content: text };
     }
 
-    const userMessageForHistory = { role: "user", content: text, imageData: firstImageData || undefined };
+    const userMessageForHistory = { id: userMsgId, role: "user", content: text, imageData: firstImageData || undefined };
 
     // サイドバイサイド表示用のコンテナを作成
     const compareContainer = document.createElement("div");
@@ -2370,14 +2410,14 @@ ${APP_MANUAL_CONTENT}
       // 履歴には最初のモデル（メインモデル）の応答のみ保存
       // 比較結果はエクスポート時には含まれない（比較は一時的な参照用）
       messages.push(userMessageForHistory);
-      messages.push({ role: "assistant", content: resultA || "(比較モード)" });
+      messages.push({ id: assistantMsgId, role: "assistant", content: resultA || "(比較モード)" });
       persistHistory();
 
     } catch (e) {
       // ★ 停止時もユーザーメッセージを履歴に保存（Edit対応）
       if (e && e.name === "AbortError") {
         messages.push(userMessageForHistory);
-        messages.push({ role: "assistant", content: contentA || "(比較モード - 停止)" });
+        messages.push({ id: assistantMsgId, role: "assistant", content: contentA || "(比較モード - 停止)" });
         persistHistory();
       }
     } finally {
@@ -2437,8 +2477,12 @@ ${APP_MANUAL_CONTENT}
     // 最初の画像をメッセージ履歴保存用に取得
     const firstImageData = imageAttachments.length > 0 ? imageAttachments[0].data : null;
 
+    // メッセージIDを事前生成
+    const userMsgId = generateMsgId();
+    const assistantMsgId = generateMsgId();
+
     // UI表示用（save: false で履歴には保存しない）
-    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData });
+    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData, msgId: userMsgId });
 
     // ★ dataset.contentを履歴と同じ内容に修正（Edit機能で検索できるようにする）
     const userMsgDiv = /** @type {HTMLDivElement} */ (el.chat.lastChild);
@@ -2464,10 +2508,10 @@ ${APP_MANUAL_CONTENT}
     }
 
     // 履歴保存用のデータを保持（API送信後に保存）
-    const userMessageForHistory = { role: "user", content: text, imageData: firstImageData || undefined };
+    const userMessageForHistory = { id: userMsgId, role: "user", content: text, imageData: firstImageData || undefined };
 
     // assistant placeholder
-    appendMessage("assistant", "...", { save: false });
+    appendMessage("assistant", "...", { save: false, msgId: assistantMsgId });
     const currentMsgDiv = /** @type {HTMLDivElement} */ (el.chat.lastChild);
 
     runtime.controller = new AbortController();
@@ -2563,7 +2607,7 @@ ${APP_MANUAL_CONTENT}
         if (!messagesSaved) {
           messagesSaved = true;
           messages.push(userMessageForHistory);
-          messages.push({ role: "assistant", content });
+          messages.push({ id: assistantMsgId, role: "assistant", content });
           persistHistory();
         }
       }
@@ -2578,7 +2622,7 @@ ${APP_MANUAL_CONTENT}
         // ★ 停止時もユーザーメッセージと途中の応答を履歴に保存（Edit/Regenerate対応）
         currentMsgDiv.dataset.content = stoppedContent;
         messages.push(userMessageForHistory);
-        messages.push({ role: "assistant", content: stoppedContent });
+        messages.push({ id: assistantMsgId, role: "assistant", content: stoppedContent });
         persistHistory();
       } else if (isLikelyServerOffline(e) && !currentContent) {
         // 生成が始まる前のエラーのみ「接続できませんでした」と表示
@@ -2594,7 +2638,7 @@ ${APP_MANUAL_CONTENT}
         if (currentContent) {
           currentMsgDiv.dataset.content = currentContent + errorMsg;
           messages.push(userMessageForHistory);
-          messages.push({ role: "assistant", content: currentContent + errorMsg });
+          messages.push({ id: assistantMsgId, role: "assistant", content: currentContent + errorMsg });
           persistHistory();
         }
       }
