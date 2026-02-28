@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **再生成ボタンのセレクタ不一致修正**: `.user-message` を検索していたが実際のクラスは `.message.user` であり、常にフォールバック経路に入っていた問題を修正
 - **autoUnload デフォルト値の逆転修正**: `Boolean(s.autoUnload)` では未設定時に `false` になるため、`s.autoUnload !== false` に変更（`showWelcome` と同パターン）
 - **セッション一覧のスタイル適用漏れ修正**: JSが出力する `session-card` / `session-active` とCSSの `session-item` / `is-active` が不一致だった問題を修正（CSSをJS側に統一）
+- **JRC2026配布版にも同修正を適用**: `Local_LLM_Chat_JRC2026/` の `js/app.js`, `assets/app.css` に上記4件の修正を反映（バージョン表記 `v1.8.0 — JRC2026 Edition` は維持）
 
 ---
 
