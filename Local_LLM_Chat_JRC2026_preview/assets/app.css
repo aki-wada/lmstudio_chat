@@ -357,12 +357,62 @@ body.dark-mode .topic-divider {
   background: #c82333;
 }
 
-.image-in-message {
-  max-width: 300px;
-  max-height: 300px;
-  border-radius: 8px;
+.image-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 8px 0;
+}
+.image-in-message {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
   border: 1px solid #ddd;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  object-fit: cover;
+}
+.image-in-message:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.image-thumbnails .image-in-message {
+  max-width: 150px;
+  max-height: 150px;
+}
+
+/* Lightbox overlay */
+.image-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  cursor: pointer;
+}
+.image-lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* Retry button (streaming timeout) */
+.retry-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 16px;
+  background: #0d6efd;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+.retry-btn:hover {
+  background: #0b5ed7;
 }
 
 /* === Responsive === */
@@ -501,6 +551,16 @@ body.dark-mode code {
 
 body.dark-mode .image-in-message {
   border: 1px solid #444;
+}
+body.dark-mode .image-in-message:hover {
+  box-shadow: 0 2px 8px rgba(255,255,255,0.15);
+}
+body.dark-mode .retry-btn {
+  background: #4dabf7;
+  color: #1a1a1a;
+}
+body.dark-mode .retry-btn:hover {
+  background: #339af0;
 }
 
 body.dark-mode #imagePreview img {

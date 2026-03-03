@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 設定パネル「モデル」タブに「🧠 思考プロセスを非表示」「🚫 Thinkingモード無効化（Qwen等）」を移動配置
 - Welcome画面のバージョン表記を `JRC2026 Edition` に変更（`v1.8.0` を削除）
 
+### Quality / UX
+- **動的コンテキストトリミング**: モデルの `max_context_length` を参照しトークン概算で動的に古い会話を削除。取得不可時は従来の6ターン制限にフォールバック。トリミング発生時に通知表示
+- **ストリーミングタイムアウト & リトライ**: SSE受信に60秒の無通信タイムアウトを追加。タイムアウト時は「再試行」ボタンを表示。HTTPエラー 401/403/500+ を個別メッセージで区別
+- **複数画像プレビュー**: ユーザーメッセージ内に添付全画像のサムネイルをflex表示。クリックでライトボックス拡大。IDB保存/復元も配列対応。後方互換あり（`imageData` 単一フィールドも維持）
+- **ヘルプテキスト外部化**: `APP_MANUAL_CONTENT`（~200行）を `assets/help-manual.txt` に分離。`getManualContent()` で遅延ロード＋キャッシュ。`file://` プロトコルでは最小フォールバックヘルプを使用
+
 ### Security
 - **XSS防止 (DOMPurify)**: `marked.parse()` → `safeMarkdown()` ラッパーに全置換。`DOMPurify.sanitize()` で全Markdown→HTML変換をサニタイズ
   - `purify.min.js` (v3.2.4) を `assets/` に同梱、CDN不要

@@ -64,7 +64,8 @@
    * @typedef {Object} StoredMessage
    * @property {Role} role
    * @property {string} content
-   * @property {string=} imageData  - user添付画像（DataURL）
+   * @property {string=} imageData  - user添付画像（DataURL）先頭1枚（後方互換）
+   * @property {string[]=} imageDataList - user添付画像の全リスト
    */
   /**
    * @typedef {Object} Settings
@@ -148,7 +149,8 @@
     PDF_MAX_BYTES:  10 * 1024 * 1024,   // 10MB
     PDF_TEXT_MAX_CHARS: 30000,           // PDFテキスト上限（約30,000文字 ≒ ~10,000トークン）
     TEXT_MAX_CHARS: 30000,               // テキストファイル上限（CSV等。PDF同等）
-    MAX_HISTORY_FOR_API: 6,             // system + last N-1 turns（実送信は userMessage を別途追加）※ コンテキスト長10,000のモデル用に縮小
+    MAX_HISTORY_FOR_API: 6,             // フォールバック: max_context_length不明時の上限
+    MAX_HISTORY_UPPER_BOUND: 30,        // 絶対上限: トークン計算でも超えない最大ターン数
     MAX_TEXTAREA_PX: 240,
     MIN_TEXTAREA_PX: 56,
     IDB_IMAGE_WARN_MB: 200,             // IndexedDB画像 警告しきい値 (MB)
@@ -327,18 +329,38 @@
   async function offloadImagesToIdb(msgs) {
     const result = [];
     for (const m of msgs) {
-      if (m.imageData && m.imageData.startsWith("data:")) {
-        const key = m.id || generateMsgId();
+      const clone = { ...m };
+      // 単一 imageData の処理（後方互換）
+      if (clone.imageData && clone.imageData.startsWith("data:")) {
+        const key = clone.id || generateMsgId();
         try {
-          await saveImageToIdb(key, m.imageData);
-          result.push({ ...m, imageData: "idb:" + key });
+          await saveImageToIdb(key, clone.imageData);
+          clone.imageData = "idb:" + key;
         } catch (e) {
           console.warn("[IDB] 画像保存失敗:", e);
-          result.push(m); // フォールバック: そのまま保持
         }
-      } else {
-        result.push(m);
       }
+      // imageDataList の処理
+      if (Array.isArray(clone.imageDataList)) {
+        const newList = [];
+        for (let i = 0; i < clone.imageDataList.length; i++) {
+          const img = clone.imageDataList[i];
+          if (img && img.startsWith("data:")) {
+            const key = (clone.id || generateMsgId()) + "_" + i;
+            try {
+              await saveImageToIdb(key, img);
+              newList.push("idb:" + key);
+            } catch (e) {
+              console.warn("[IDB] 画像保存失敗:", e);
+              newList.push(img);
+            }
+          } else {
+            newList.push(img);
+          }
+        }
+        clone.imageDataList = newList;
+      }
+      result.push(clone);
     }
     return result;
   }
@@ -351,18 +373,37 @@
   async function rehydrateImagesFromIdb(msgs) {
     const result = [];
     for (const m of msgs) {
-      if (m.imageData && m.imageData.startsWith("idb:")) {
-        const key = m.imageData.slice(4);
+      const clone = { ...m };
+      // 単一 imageData の復元（後方互換）
+      if (clone.imageData && clone.imageData.startsWith("idb:")) {
+        const key = clone.imageData.slice(4);
         try {
           const data = await getImageFromIdb(key);
-          result.push({ ...m, imageData: data || m.imageData });
+          if (data) clone.imageData = data;
         } catch (e) {
           console.warn("[IDB] 画像復元失敗:", e);
-          result.push(m);
         }
-      } else {
-        result.push(m);
       }
+      // imageDataList の復元
+      if (Array.isArray(clone.imageDataList)) {
+        const newList = [];
+        for (const img of clone.imageDataList) {
+          if (img && img.startsWith("idb:")) {
+            const key = img.slice(4);
+            try {
+              const data = await getImageFromIdb(key);
+              newList.push(data || img);
+            } catch (e) {
+              console.warn("[IDB] 画像復元失敗:", e);
+              newList.push(img);
+            }
+          } else {
+            newList.push(img);
+          }
+        }
+        clone.imageDataList = newList;
+      }
+      result.push(clone);
     }
     return result;
   }
@@ -617,209 +658,30 @@
   let currentSessionId = "";
 
   // ---------------------------------------------------------------------------
-  // Help Mode: アプリマニュアル内容（LLMに参照させる）
+  // Help Mode: マニュアル内容の遅延ロード
   // ---------------------------------------------------------------------------
 
-  const APP_MANUAL_CONTENT = `
-# Local LLM Chat v1.8.0 使い方ガイド
+  let _manualContentCache = null;
 
-## 概要
-Local LLM Chatは、ローカルで動作するLLMサーバー（LM Studio、Ollamaなど）と連携するWebベースのチャットアプリです。完全オフラインで動作し、プライバシーを重視した設計です。
+  const HELP_MANUAL_FALLBACK = `# Local LLM Chat ヘルプ
+このアプリはローカルLLMサーバー（LM Studio / Ollama）と連携するチャットアプリです。
+- LM Studioを起動しモデルをロード → 自動でAPIが有効に
+- 画像・ファイル添付対応（Vision対応モデルで画像認識可能）
+- ⚖️ 比較モードで2つのモデルの回答を並べて比較
+- 詳しくは MANUAL.md を参照してください。`;
 
-## v1.8.0 新機能
-- 🧠 **reasoning_effort**: モデルの推論レベル（low/medium/high）を設定可能
-- 💭 **Thinking表示**: <think>タグの思考プロセスを折りたたみ表示（表示/非表示切替）
-- 🚫 **Thinkingモード無効化**: Qwen等のthinkingモデルの思考自体を無効化（/no_think送信）
-- ⌨️ **ショートカット一覧**: Ctrl+/ でキーボードショートカット一覧を表示
-- 👁️ **モデル表示フィルター**: ドロップダウンに表示するモデルを選択可能
-- 📂 **セッション管理**: 複数の会話セッションを管理・切り替え
-
-## v1.7.1 新機能
-- ⚖️ **モデル比較機能**: 2つのモデルの回答を並べて比較表示（目玉機能）
-- **モデルリスト自動更新**: ドロップダウンクリック時に自動更新
-- **ヘッダーUI改善**: ボタンを機能グループごとに整理
-- **ストレージキー変更**: バージョン依存のないキー名に変更（自動移行あり）
-
-## LM Studio バージョン情報
-**公式サイトからダウンロードすると v0.4.1 がインストールされます。**
-
-v0.4.1では「**モデルをロード＝使える**」状態になります。サーバー設定は触る必要がありません。
-
-| 機能 | 0.3.x | 0.4.x |
-|------|-------|-------|
-| サーバー起動 | 手動 | **モデルロード時に自動** |
-| 複数モデル同時ロード | 非対応 | **対応** |
-| CORS設定場所 | 開発者タブ | **設定 → Local Server** |
-
-## 起動方法（3ステップ）
-1. **LM Studioを起動し、モデルをロード**（自動でAPIが有効になる）
-2. **local_llm_chat_v1.8.0.html をブラウザで開く**
-3. **モデルが自動的にドロップダウンに表示** → 会話開始！
-
-**疎通確認**: うまくいかない場合はターミナルで実行:
-\`curl http://localhost:1234/v1/models\`
-- 返答あり → OK
-- 返答なし → モデルがロードされていない
-
-## 新しいモデルの追加方法
-新しいモデルを追加するには、LM Studioでダウンロードします。
-
-### ダウンロード手順
-1. 左側メニューから「探索」を開く（⌘⇧M）
-   - 「Mission Control」ウィンドウが開きます
-2. モデルを検索
-   - 上部の検索バー（「Hugging Faceでモデルを検索...」）にモデル名を入力
-   - 例: qwen, llama, gemma, glm など
-3. フォーマットを選択（検索バー右側のチェックボックス）
-   - GGUF: CPU/GPU汎用フォーマット（推奨）
-   - MLX: Apple Silicon最適化フォーマット
-   - Windowsは GGUF を選択してください
-4. ダウンロードしたいモデルをリストから選択
-   - 右側で詳細情報と量子化レベル（4BIT等）を確認
-5. 右下の「ダウンロード」ボタンをクリック
-
-**モデルの切り替え**: ダウンロード済みのモデルは、Local LLM Chatのモデル選択ドロップダウンから選択すれば自動で読み込まれます。
-
-## 画面構成
-### ヘッダー
-- モデル選択: ロードされているモデルを選択（👁️マークはVision対応）- クリック時に自動更新
-- ⚖️ 比較: モデル比較モードのON/OFF（v1.7新機能）
-- 比較モデル選択: 比較モードON時のみ表示、2つ目のモデルを選択
-- 🗑️ クリア: 画面の会話をすべて消去
-- ❓: ヘルプモードのON/OFF
-- ⚙️: 設定パネルを開く
-
-### 入力エリア
-- 📷 Image: 画像ファイルを添付（複数可、20MB以下）
-- 📎 File: テキスト/PDFファイルを添付（テキスト2MB、PDF10MB以下）
-- 🔍 深掘り: より深く分析した回答を促すモード
-- 🚀 Send: メッセージを送信
-- ⏹ Stop: 生成を中断
-- 📋 Preset: プリセットプロンプトを挿入
-
-## 主な機能
-
-### モデル比較機能（v1.7新機能）
-⚖️ 比較ボタンをONにすると、2つのモデルの回答を並べて比較できます。
-- 同じ質問を2つのモデルに同時に送信
-- 並列ストリーミングで両方の回答をリアルタイム表示
-- モバイル対応（768px以下で縦並び表示）
-- 要件: LM Studio v0.4.0以降で複数モデルを同時ロード（Developers設定の「JIT models auto-evict」をOFFにすること）
-
-### チャット機能
-- ストリーミング応答でリアルタイム表示
-- Markdown対応（コードブロック、表など）
-- メッセージ操作: Copy、Delete、Edit（ユーザーのみ）、Regenerate（AIのみ）
-
-### 画像・ファイル添付
-- Vision対応モデル（👁️マーク）で画像認識
-- 対応方法: ボタン、Ctrl+V（ペースト）、ドラッグ＆ドロップ
-- PDF: テキスト抽出してLLMに送信
-
-### 深掘りモード
-🔍ボタンで有効化すると、より深く分析した回答を促します
-
-### ヘルプモード
-❓ボタンで有効化すると、このアプリの使い方をLLMに質問できます
-
-### スマートスクロール
-ストリーミング中に上スクロールすると自動スクロールが停止、下部に戻ると再開
-
-## 設定項目
-- Base URL: LLMサーバーのURL（デフォルト: http://localhost:1234/v1）
-- Temperature: 0=安定、2=創造的（デフォルト: 0.7）
-- Max Tokens: 最大出力トークン数（デフォルト: 2048）
-- 送信キー: Enter または Ctrl+Enter で送信
-- 応答スタイル: 簡潔/標準/詳細/専門的
-- ユーザープロフィール: 専門レベル、職業、興味を設定可能
-
-## キーボードショートカット
-- Enter / Ctrl+Enter: メッセージ送信（設定による）
-- Shift+Enter: 改行
-- Ctrl+V: 画像ペースト
-- Ctrl+K: 履歴クリア
-- Esc: パネルを閉じる
-
-## トラブルシューティング
-
-### まず確認：curlで疎通テスト
-問題が発生したら、まずターミナルで実行: \`curl http://localhost:1234/v1/models\`
-- **返答あり** → LM Studioは正常。ブラウザ側（CORS等）の問題
-- **返答なし** → LM Studioでモデルがロードされていない
-
-### モデルが表示されない
-1. **モデルがロードされているか確認**（最重要）
-2. 上記curlコマンドで疎通確認
-3. CORSが有効か確認（設定 → Local Server → 「CORSを有効にする」がON）
-4. モデル選択ドロップダウンをクリックして更新
-
-### 比較機能が動作しない
-1. **2つのモデルがLM Studioでロードされているか確認**
-2. 比較モード（⚖️ボタン）がONになっているか確認
-3. LM Studio Developers設定の「JIT models auto-evict」がOFFになっているか確認
-
-### 画像が認識されない
-1. Vision対応モデル（👁️マーク）を選択
-2. 画像サイズが20MB以下か確認
-3. 30B以上のモデル推奨
-
-### 応答が途中で止まる・遅い
-1. Max Tokensの値を確認（小さすぎると途中で切れる）
-2. より小さいモデルを試す
-3. 長い会話は🆕新しい話題ボタンでリセット
-
-## よくある質問（FAQ）
-
-### Q: このアプリは無料ですか？
-A: はい、完全無料です。オープンソースで提供されています。
-
-### Q: インターネット接続は必要ですか？
-A: いいえ、完全オフラインで動作します。LM Studioもローカルで動作するため、インターネット不要です。
-
-### Q: データはどこに保存されますか？
-A: 会話履歴と設定はブラウザのlocalStorageに保存されます。外部サーバーには一切送信されません。
-
-### Q: 会話履歴を削除するには？
-A: 「🗑️ クリア」ボタンで画面の会話を削除できます。設定や保存データも含めて完全に消したい場合は、設定パネルの「すべての保存データを消す」を使用してください。
-
-### Q: モデル比較機能の使い方は？
-A: ⚖️比較ボタンをONにして、2つ目のモデルを選択してからメッセージを送信します。LM Studioで2つのモデルをロードしておく必要があります。
-
-### Q: 複数のモデルを同時に使えますか？
-A: LM Studioで複数モデルをロードし、ドロップダウンで切り替え可能です。v1.7では⚖️比較機能で2つのモデルを同時に使えます。
-
-### Q: システムプロンプトとは何ですか？
-A: LLMに対する初期指示です。AIの振る舞いや応答スタイルを設定できます。
-
-### Q: プリセットをカスタマイズできますか？
-A: はい、設定パネルの「プリセット編集」で追加・編集・削除できます。
-
-### Q: 深掘りモードとヘルプモードの違いは？
-A: 深掘りモードは回答をより詳細に分析、ヘルプモードはこのアプリの使い方を質問するためのモードです。
-
-### Q: 対応しているファイル形式は？
-A: 画像（JPG, PNG, GIF, WebP）、テキスト（txt, md, json, csv, py, jsなど）、PDF
-
-### Q: スマホでも使えますか？
-A: ブラウザがあれば動作しますが、LM Studioが必要なためPC推奨です。
-
-### Q: 会話をリセットしたい場合は？
-A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態に戻ります。AIの記憶もリセットされます。
-
-## 免責事項・損害補償について
-
-**重要: このアプリを使用して生じた損害について、作成者は一切の補償を行いません。**
-
-本ソフトウェア（Local LLM Chat）は「現状有姿」で無償提供されており、以下の条件で使用されます：
-
-1. **自己責任での使用**: 本ソフトウェアの使用は、すべてユーザー自身の責任において行われます。
-2. **無保証**: 作成者は、本ソフトウェアの正確性、信頼性、完全性、有用性について、いかなる保証も行いません。
-3. **損害の免責**: 作成者は、本ソフトウェアの使用または使用不能から生じるいかなる損害（直接的、間接的、偶発的、特別、結果的損害を含む）についても、一切の責任を負いません。
-4. **AI出力の検証**: AIによる出力結果は参考情報です。重要な判断を行う前には必ず専門家への相談や独自の検証を行ってください。
-5. **医療・法律・財務への非適用**: 本ソフトウェアは医療診断、法的助言、財務アドバイスを提供するものではありません。これらの分野での判断には、必ず資格を持つ専門家にご相談ください。
-
-本ソフトウェアを使用した時点で、上記の免責事項に同意したものとみなされます。
-`.trim();
+  async function getManualContent() {
+    if (_manualContentCache) return _manualContentCache;
+    try {
+      const res = await fetch("./assets/help-manual.txt");
+      if (!res.ok) throw new Error(res.statusText);
+      _manualContentCache = (await res.text()).trim();
+    } catch (e) {
+      console.warn("[Help] マニュアル外部ファイル読込失敗、フォールバック使用:", e.message);
+      _manualContentCache = HELP_MANUAL_FALLBACK;
+    }
+    return _manualContentCache;
+  }
 
   // ---------------------------------------------------------------------------
   // Markdown (marked) - safe-ish renderer tweaks
@@ -852,6 +714,37 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
   /** @param {string} raw */
   function trimTrailingSlashes(raw) {
     return String(raw || "").replace(/\/+$/, "");
+  }
+
+  /**
+   * テキストのトークン数を概算する
+   * 日本語: ~1.5 chars/token, 英語: ~4 chars/token → 安全平均 ~2 chars/token
+   * @param {string|Array} content - テキストまたはVision API形式のcontent配列
+   * @returns {number}
+   */
+  function estimateTokens(content) {
+    if (!content) return 0;
+    if (typeof content === "string") return Math.ceil(content.length / 2);
+    if (Array.isArray(content)) {
+      let tokens = 0;
+      for (const item of content) {
+        if (item.type === "text") tokens += Math.ceil((item.text || "").length / 2);
+        else if (item.type === "image_url") tokens += 300;
+      }
+      return tokens;
+    }
+    return 0;
+  }
+
+  /**
+   * 現在選択中のモデルの max_context_length を取得する
+   * @returns {number|null}
+   */
+  function getModelContextLength() {
+    const model = el.modelSelect.value || settings.model;
+    if (!model) return null;
+    const details = runtime.modelDetails.get(model);
+    return details?.max_context_length || null;
   }
 
   /** @param {string} text */
@@ -1532,13 +1425,18 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
         messages = hydrated;
         // 画像を含むメッセージのDOM要素を更新
         hydrated.forEach(m => {
-          if (m.imageData && !m.imageData.startsWith("idb:")) {
-            const msgEl = document.querySelector(`[data-msg-id="${m.id}"]`);
-            if (msgEl) {
-              msgEl.dataset.imageData = m.imageData;
-              const img = msgEl.querySelector("img.image-in-message");
-              if (img) img.src = m.imageData;
-            }
+          const msgEl = document.querySelector(`[data-msg-id="${m.id}"]`);
+          if (!msgEl) return;
+          const thumbsDiv = msgEl.querySelector(".image-thumbnails");
+          if (thumbsDiv && Array.isArray(m.imageDataList)) {
+            const imgs = thumbsDiv.querySelectorAll("img.image-in-message");
+            m.imageDataList.forEach((d, i) => {
+              if (imgs[i] && d && !d.startsWith("idb:")) imgs[i].src = d;
+            });
+          } else if (m.imageData && !m.imageData.startsWith("idb:")) {
+            msgEl.dataset.imageData = m.imageData;
+            const img = msgEl.querySelector("img.image-in-message");
+            if (img) img.src = m.imageData;
           }
         });
       }).catch(e => console.warn("[IDB] 画像復元失敗:", e));
@@ -1632,7 +1530,7 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     if (messages.length === 0) {
       showWelcomeScreen();
     } else {
-      messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, msgId: m.id }));
+      messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, imageDataList: m.imageDataList || null, msgId: m.id }));
     }
     renderSessionList();
 
@@ -1640,13 +1538,19 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     rehydrateImagesFromIdb(messages).then(hydrated => {
       messages = hydrated;
       hydrated.forEach(m => {
-        if (m.imageData && !m.imageData.startsWith("idb:")) {
-          const msgEl = document.querySelector(`[data-msg-id="${m.id}"]`);
-          if (msgEl) {
-            msgEl.dataset.imageData = m.imageData;
-            const img = msgEl.querySelector("img.image-in-message");
-            if (img) img.src = m.imageData;
-          }
+        const msgEl = document.querySelector(`[data-msg-id="${m.id}"]`);
+        if (!msgEl) return;
+        // imageDataList がある場合はサムネイル群を更新
+        const thumbsDiv = msgEl.querySelector(".image-thumbnails");
+        if (thumbsDiv && Array.isArray(m.imageDataList)) {
+          const imgs = thumbsDiv.querySelectorAll("img.image-in-message");
+          m.imageDataList.forEach((d, i) => {
+            if (imgs[i] && d && !d.startsWith("idb:")) imgs[i].src = d;
+          });
+        } else if (m.imageData && !m.imageData.startsWith("idb:")) {
+          msgEl.dataset.imageData = m.imageData;
+          const img = msgEl.querySelector("img.image-in-message");
+          if (img) img.src = m.imageData;
         }
       });
     }).catch(e => console.warn("[IDB] 画像復元失敗:", e));
@@ -1666,6 +1570,11 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
         if (m.imageData && m.imageData.startsWith("idb:")) {
           deleteImageFromIdb(m.imageData.slice(4)).catch(() => {});
         }
+        if (Array.isArray(m.imageDataList)) {
+          for (const img of m.imageDataList) {
+            if (img && img.startsWith("idb:")) deleteImageFromIdb(img.slice(4)).catch(() => {});
+          }
+        }
       }
     }
 
@@ -1681,7 +1590,7 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
 
         // UI更新
         el.chat.innerHTML = "";
-        messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, msgId: m.id }));
+        messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, imageDataList: m.imageDataList || null, msgId: m.id }));
       } else {
         // セッションが全て削除された場合は新規作成
         createNewSession(true);
@@ -1812,7 +1721,7 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
    */
   function appendMessage(role, content, opts = {}) {
     if (role !== "system") hideWelcomeScreen();
-    const { save = true, imageData = null, msgId = null } = opts;
+    const { save = true, imageData = null, imageDataList = null, msgId = null } = opts;
 
     const id = msgId || generateMsgId();
 
@@ -1824,22 +1733,32 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     container.dataset.content = content;
     if (imageData) container.dataset.imageData = imageData;
 
-    // user画像添付はメッセージ内にも表示
-    if (imageData && role === "user") {
-      const img = document.createElement("img");
-      img.classList.add("image-in-message");
-      if (imageData.startsWith("idb:")) {
-        // IndexedDB から非同期で復元
-        img.alt = "読込中…";
-        const idbKey = imageData.slice(4);
-        getImageFromIdb(idbKey).then(data => {
-          if (data) { img.src = data; container.dataset.imageData = data; }
-          else img.alt = "画像が見つかりません";
-        }).catch(() => { img.alt = "画像読込エラー"; });
-      } else {
-        img.src = imageData;
+    // user画像添付はメッセージ内にも表示（複数画像対応）
+    if (role === "user") {
+      const imagesToRender = imageDataList || (imageData ? [imageData] : []);
+      if (imagesToRender.length > 0) {
+        const thumbsDiv = document.createElement("div");
+        thumbsDiv.classList.add("image-thumbnails");
+        for (const imgSrc of imagesToRender) {
+          const img = document.createElement("img");
+          img.classList.add("image-in-message");
+          if (imgSrc.startsWith("idb:")) {
+            img.alt = "読込中…";
+            const idbKey = imgSrc.slice(4);
+            getImageFromIdb(idbKey).then(data => {
+              if (data) img.src = data;
+              else img.alt = "画像が見つかりません";
+            }).catch(() => { img.alt = "画像読込エラー"; });
+          } else {
+            img.src = imgSrc;
+          }
+          img.addEventListener("click", () => {
+            if (img.src) showImageLightbox(img.src);
+          });
+          thumbsDiv.appendChild(img);
+        }
+        container.appendChild(thumbsDiv);
       }
-      container.appendChild(img);
     }
 
     // 本文（assistantは markdown + thinking対応）
@@ -1863,11 +1782,23 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     scrollToBottom();
 
     if (save) {
-      messages.push({ id, role, content, imageData: imageData || undefined });
+      messages.push({ id, role, content, imageData: imageData || undefined, imageDataList: imageDataList || undefined });
       persistHistory();
     }
 
     return id;
+  }
+
+  /** ライトボックス: 画像クリックで拡大表示 */
+  function showImageLightbox(src) {
+    const overlay = document.createElement("div");
+    overlay.classList.add("image-lightbox-overlay");
+    overlay.addEventListener("click", () => overlay.remove());
+    const img = document.createElement("img");
+    img.src = src;
+    img.classList.add("image-lightbox-img");
+    overlay.appendChild(img);
+    document.body.appendChild(overlay);
   }
 
   /**
@@ -2177,12 +2108,13 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
 
     // ヘルプモードの場合は専用のシステムプロンプトを使用
     if (helpMode) {
+      const manual = _manualContentCache || HELP_MANUAL_FALLBACK;
       sysPrompt = `あなたは「Local LLM Chat」アプリのヘルプアシスタントです。
 以下のアプリマニュアルを参照して、ユーザーの質問に日本語で丁寧に回答してください。
 マニュアルに記載されていない内容については「マニュアルに記載がありません」と伝えてください。
 
 ---
-${APP_MANUAL_CONTENT}
+${manual}
 ---
 
 上記のマニュアル内容を基に、ユーザーの質問に回答してください。`;
@@ -2212,10 +2144,14 @@ ${APP_MANUAL_CONTENT}
       if (m.role === last) continue;
 
       // Vision API形式に変換（user画像のみ、idb:参照はスキップ）
-      if (m.role === "user" && m.imageData && !m.imageData.startsWith("idb:")) {
+      const imgList = m.imageDataList || (m.imageData ? [m.imageData] : []);
+      const validImgs = imgList.filter(d => d && !d.startsWith("idb:"));
+      if (m.role === "user" && validImgs.length > 0) {
         const contentArray = [];
         if (m.content) contentArray.push({ type: "text", text: m.content });
-        contentArray.push({ type: "image_url", image_url: { url: m.imageData } });
+        for (const imgUrl of validImgs) {
+          contentArray.push({ type: "image_url", image_url: { url: imgUrl } });
+        }
         conv.push({ role: "user", content: contentArray });
       } else {
         conv.push({ role: m.role, content: m.content });
@@ -2229,8 +2165,34 @@ ${APP_MANUAL_CONTENT}
     // もし末尾が user で終わっている場合（削除操作等）のみ除去する。
     if (conv.length > 1 && conv.at(-1).role === "user") conv.pop();
 
-    // systemは常に残し、残りを末尾から LIMITS.MAX_HISTORY_FOR_API-1 個取る
-    const tail = conv.slice(1).slice(-(LIMITS.MAX_HISTORY_FOR_API - 1));
+    // systemは常に残し、まず絶対上限でスライス
+    const tail = conv.slice(1).slice(-LIMITS.MAX_HISTORY_UPPER_BOUND);
+
+    // 動的コンテキストトリミング: モデルのmax_context_lengthに基づき調整
+    const contextLength = getModelContextLength();
+    const maxTokens = parseInt(el.maxTokens.value, 10) || 2048;
+
+    if (contextLength) {
+      const budget = contextLength - maxTokens - 200; // 200 = safety margin
+      const sysTokens = estimateTokens(conv[0].content);
+      let sumTail = 0;
+      for (const m of tail) sumTail += estimateTokens(m.content);
+
+      let trimmed = false;
+      while (tail.length > 0 && (sysTokens + sumTail) > budget) {
+        sumTail -= estimateTokens(tail[0].content);
+        tail.shift();
+        trimmed = true;
+      }
+      if (trimmed) {
+        notify("⚠️ コンテキスト長に合わせて古い会話を省略しました");
+      }
+    } else {
+      // フォールバック: max_context_length不明 → 従来の6ターン制限
+      while (tail.length > (LIMITS.MAX_HISTORY_FOR_API - 1)) {
+        tail.shift();
+      }
+    }
 
     // tailが assistant で始まる場合、対応するuserが欠落しているので除去
     if (tail.length > 0 && tail[0].role === "assistant") tail.shift();
@@ -2548,12 +2510,25 @@ ${APP_MANUAL_CONTENT}
    * @param {(delta:string)=>void} onDelta
    * @param {()=>void} onDone
    */
-  async function consumeSSE(reader, onDelta, onDone) {
+  async function consumeSSE(reader, onDelta, onDone, { timeoutMs = 60000 } = {}) {
     const decoder = new TextDecoder("utf-8");
     let buf = "";
 
     while (true) {
-      const { value, done } = await reader.read();
+      // タイムアウト: timeoutMs 間データが来なければ TimeoutError
+      let result;
+      try {
+        result = await Promise.race([
+          reader.read(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new DOMException("SSE inactivity timeout", "TimeoutError")), timeoutMs)
+          ),
+        ]);
+      } catch (e) {
+        reader.cancel().catch(() => {});
+        throw e;
+      }
+      const { value, done } = result;
       if (done) break;
 
       buf += decoder.decode(value, { stream: true });
@@ -2662,14 +2637,15 @@ ${APP_MANUAL_CONTENT}
     const { textForApi, displayText, imageAttachments } = injectAttachmentsIntoText(text);
     text = textForApi;
 
-    const firstImageData = imageAttachments.length > 0 ? imageAttachments[0].data : null;
+    const allImageData = imageAttachments.map(img => img.data);
+    const firstImageData = allImageData.length > 0 ? allImageData[0] : null;
 
     // メッセージIDを事前生成
     const userMsgId = generateMsgId();
     const assistantMsgId = generateMsgId();
 
     // ユーザーメッセージを表示
-    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData, msgId: userMsgId });
+    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData, imageDataList: allImageData.length > 0 ? allImageData : null, msgId: userMsgId });
     const userMsgDiv = /** @type {HTMLDivElement} */ (el.chat.lastChild);
     if (userMsgDiv) userMsgDiv.dataset.content = text;
 
@@ -2694,7 +2670,7 @@ ${APP_MANUAL_CONTENT}
       userMessage = { role: "user", content: text };
     }
 
-    const userMessageForHistory = { id: userMsgId, role: "user", content: text, imageData: firstImageData || undefined };
+    const userMessageForHistory = { id: userMsgId, role: "user", content: text, imageData: firstImageData || undefined, imageDataList: allImageData.length > 0 ? allImageData : undefined };
 
     // サイドバイサイド表示用のコンテナを作成
     const compareContainer = document.createElement("div");
@@ -2808,6 +2784,9 @@ ${APP_MANUAL_CONTENT}
         if (e && e.name === "AbortError") {
           const currentContent = updateContent(null);
           if (contentEl) contentEl.innerHTML = safeMarkdown(currentContent + "\n\n⏹ **生成を停止しました。**");
+        } else if (e && e.name === "TimeoutError") {
+          const currentContent = updateContent(null);
+          if (contentEl) contentEl.innerHTML = safeMarkdown((currentContent || "") + "\n\n⏳ **タイムアウト（60秒）**");
         } else {
           if (contentEl) contentEl.textContent = `エラー: ${e?.message || e}`;
         }
@@ -2889,15 +2868,16 @@ ${APP_MANUAL_CONTENT}
     const { textForApi, displayText, imageAttachments } = injectAttachmentsIntoText(text);
     text = textForApi;
 
-    // 最初の画像をメッセージ履歴保存用に取得
-    const firstImageData = imageAttachments.length > 0 ? imageAttachments[0].data : null;
+    // 画像をメッセージ履歴保存用に取得（全画像 + 後方互換用先頭1枚）
+    const allImageData = imageAttachments.map(img => img.data);
+    const firstImageData = allImageData.length > 0 ? allImageData[0] : null;
 
     // メッセージIDを事前生成
     const userMsgId = generateMsgId();
     const assistantMsgId = generateMsgId();
 
     // UI表示用（save: false で履歴には保存しない）
-    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData, msgId: userMsgId });
+    appendMessage("user", displayText || "(添付ファイルのみ)", { save: false, imageData: firstImageData, imageDataList: allImageData.length > 0 ? allImageData : null, msgId: userMsgId });
 
     // ★ dataset.contentを履歴と同じ内容に修正（Edit機能で検索できるようにする）
     const userMsgDiv = /** @type {HTMLDivElement} */ (el.chat.lastChild);
@@ -2928,7 +2908,7 @@ ${APP_MANUAL_CONTENT}
     }
 
     // 履歴保存用のデータを保持（API送信後に保存）
-    const userMessageForHistory = { id: userMsgId, role: "user", content: text, imageData: firstImageData || undefined };
+    const userMessageForHistory = { id: userMsgId, role: "user", content: text, imageData: firstImageData || undefined, imageDataList: allImageData.length > 0 ? allImageData : undefined };
 
     // assistant placeholder
     appendMessage("assistant", "...", { save: false, msgId: assistantMsgId });
@@ -2977,7 +2957,15 @@ ${APP_MANUAL_CONTENT}
         if (!res.ok || !res.body) {
           const t = await res.text().catch(() => "");
           const contentEl = currentMsgDiv.querySelector(".message-content");
-          if (contentEl) contentEl.textContent = `エラー:${res.status}${t ? " / " + t : ""}`;
+          if (res.status === 401 || res.status === 403) {
+            if (contentEl) contentEl.textContent = "API鍵が正しくないか、認証に失敗しました。";
+            notify("🔑 API鍵を確認してください（設定 → モデル → API Key）");
+          } else if (res.status >= 500) {
+            if (contentEl) contentEl.textContent = "サーバーエラーが発生しました。LM Studioを再起動してください。";
+            notify("⚠️ サーバーエラー (HTTP " + res.status + ")");
+          } else {
+            if (contentEl) contentEl.textContent = `エラー:${res.status}${t ? " / " + t : ""}`;
+          }
           return;
         }
 
@@ -3050,6 +3038,29 @@ ${APP_MANUAL_CONTENT}
         messages.push(userMessageForHistory);
         messages.push({ id: assistantMsgId, role: "assistant", content: stoppedContent });
         persistHistory();
+      } else if (e && e.name === "TimeoutError") {
+        // タイムアウト: 60秒間データなし
+        const timeoutMsg = currentContent
+          ? currentContent + "\n\n⏳ **応答がありません（60秒タイムアウト）**"
+          : "⏳ 応答がありません（60秒タイムアウト）";
+        if (contentEl) {
+          contentEl.innerHTML = safeMarkdown(timeoutMsg);
+          const retryBtn = document.createElement("button");
+          retryBtn.textContent = "🔄 再試行";
+          retryBtn.className = "msg-btn";
+          retryBtn.style.cssText = "margin-top:8px;padding:6px 16px;background:#17a2b8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.9em";
+          retryBtn.onclick = () => {
+            currentMsgDiv.remove();
+            handleSend();
+          };
+          contentEl.appendChild(retryBtn);
+        }
+        if (currentContent) {
+          currentMsgDiv.dataset.content = timeoutMsg;
+          messages.push(userMessageForHistory);
+          messages.push({ id: assistantMsgId, role: "assistant", content: timeoutMsg });
+          persistHistory();
+        }
       } else if (isLikelyServerOffline(e) && !currentContent) {
         // 生成が始まる前のエラーのみ「接続できませんでした」と表示
         if (contentEl) contentEl.textContent = "接続できませんでした。LM Studioが起動していない可能性があります。";
@@ -4369,6 +4380,8 @@ AI応答テキスト:
     updateHelpButton();
 
     if (helpMode) {
+      // マニュアルを事前ロード（キャッシュに格納）
+      getManualContent().catch(() => {});
       notify("❓ ヘルプモード ON - アプリの使い方を質問してください");
     } else {
       notify("❓ ヘルプモード OFF");
@@ -4520,7 +4533,7 @@ AI応答テキスト:
 
   function renderHistoryFromStorage() {
     messages = loadHistory();
-    messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null }));
+    messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, imageDataList: m.imageDataList || null, msgId: m.id }));
   }
 
   async function init() {
