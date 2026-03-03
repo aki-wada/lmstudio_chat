@@ -6,6 +6,7 @@
 <title>Local LLM Chat — JRC2026 Edition</title>
 <link rel="stylesheet" href="assets/app.css" />
 <link rel="stylesheet" href="assets/katex.min.css" />
+<script src="./assets/purify.min.js"></script>
 <script src="./assets/marked.min.js"></script>
 <script src="./assets/pdf.min.js"></script>
 <script>
@@ -204,7 +205,14 @@
       <label>🔗 Base URL:</label>
       <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:200px" />
     </div>
-    <input type="hidden" id="apiKey" value="lmstudio" />
+    <div class="settings-row">
+      <label>🔑 API Key:</label>
+      <input type="password" id="apiKey" value="lmstudio" style="width:180px" autocomplete="off" />
+    </div>
+    <div class="settings-row">
+      <label><input type="checkbox" id="persistApiKeyToggle" /> この端末にAPI鍵を保存する</label>
+      <small style="color:#888;margin-left:4px">（OFFならタブを閉じると消去）</small>
+    </div>
     <div class="settings-row">
       <label><input type="checkbox" id="autoUnloadToggle" /> 🔄 モデル切替時に自動アンロード</label>
     </div>

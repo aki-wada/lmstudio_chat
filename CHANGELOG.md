@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 設定パネル「モデル」タブに「🧠 思考プロセスを非表示」「🚫 Thinkingモード無効化（Qwen等）」を移動配置
 - Welcome画面のバージョン表記を `JRC2026 Edition` に変更（`v1.8.0` を削除）
 
+### Security
+- **XSS防止 (DOMPurify)**: `marked.parse()` → `safeMarkdown()` ラッパーに全置換。`DOMPurify.sanitize()` で全Markdown→HTML変換をサニタイズ
+  - `purify.min.js` (v3.2.4) を `assets/` に同梱、CDN不要
+  - `showTermCheckModal()` の医学用語チェック結果も `escapeHtml()` でエスケープ
+  - `renderAttachmentList()` のファイル名もエスケープ
+- **API鍵保護 (sessionStorage)**: デフォルトで API Key を `sessionStorage` に保存（タブを閉じると消去）
+  - 「この端末にAPI鍵を保存する」チェックボックスを追加（モデルタブ）
+  - OFF（デフォルト）: sessionStorage → タブ/ブラウザ終了で消去
+  - ON: localStorage → 永続保存（従来動作）
+  - `clearAllData()` / `resetSettingsToDefault()` で sessionStorage も正しくクリア
+- **IndexedDB画像オフロード**: 画像DataURLをlocalStorageからIndexedDBに自動移行し、5MB上限を回避
+  - `persistHistory()` で画像を非同期にIndexedDBへ保存、localStorage内は `idb:<key>` 参照に置換
+  - セッション読込・切替時に自動復元（`rehydrateImagesFromIdb()`）
+  - 画像容量 200MB超で警告、500MB超で古い画像を自動削除
+  - `deleteSession()` / `clearAllData()` で IndexedDB も同時クリア
+
 ### Notes
 - `Local_LLM_Chat_JRC2026_old/` = 元のJRC2026配布版（変更なし）
 - `local_llm_chat_v1.8.2/` = v1.8.0+JRC2026マージ版（開発停止、参照用）

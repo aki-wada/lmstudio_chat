@@ -151,7 +151,242 @@
     MAX_HISTORY_FOR_API: 6,             // system + last N-1 turns（実送信は userMessage を別途追加）※ コンテキスト長10,000のモデル用に縮小
     MAX_TEXTAREA_PX: 240,
     MIN_TEXTAREA_PX: 56,
+    IDB_IMAGE_WARN_MB: 200,             // IndexedDB画像 警告しきい値 (MB)
+    IDB_IMAGE_MAX_MB: 500,              // IndexedDB画像 自動削除しきい値 (MB)
   });
+
+  // ---------------------------------------------------------------------------
+  // IndexedDB: 画像データのオフロード（localStorage 5MB上限回避）
+  // ---------------------------------------------------------------------------
+
+  const IDB_NAME = "localLLMChat_images";
+  const IDB_VERSION = 1;
+  const IDB_STORE = "images";
+
+  /** @type {IDBDatabase|null} */
+  let _idb = null;
+
+  /**
+   * IndexedDB を開く（初回時にストアを自動作成）
+   * @returns {Promise<IDBDatabase>}
+   */
+  function openImageDb() {
+    if (_idb) return Promise.resolve(_idb);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => { _idb = req.result; resolve(_idb); };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /**
+   * IndexedDB に画像を保存する
+   * @param {string} key - 一意キー（例: メッセージID）
+   * @param {string} dataUrl - base64 DataURL
+   * @returns {Promise<void>}
+   */
+  async function saveImageToIdb(key, dataUrl) {
+    const db = await openImageDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(dataUrl, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /**
+   * IndexedDB から画像を取得する
+   * @param {string} key
+   * @returns {Promise<string|undefined>}
+   */
+  async function getImageFromIdb(key) {
+    const db = await openImageDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /**
+   * IndexedDB から画像を削除する
+   * @param {string} key
+   * @returns {Promise<void>}
+   */
+  async function deleteImageFromIdb(key) {
+    const db = await openImageDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /**
+   * IndexedDB の全画像を削除する
+   * @returns {Promise<void>}
+   */
+  async function clearAllImagesFromIdb() {
+    const db = await openImageDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /**
+   * IndexedDB 内の画像総サイズを取得する (bytes)
+   * @returns {Promise<number>}
+   */
+  async function getIdbImagesTotalSize() {
+    const db = await openImageDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.openCursor();
+      let total = 0;
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (cursor) {
+          if (typeof cursor.value === "string") total += cursor.value.length * 2; // UTF-16
+          cursor.continue();
+        } else {
+          resolve(total);
+        }
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /**
+   * IndexedDB から最も古い画像を削除する（容量超過時に呼ぶ）
+   * @param {number} targetBytes - この値以下になるまで削除
+   * @returns {Promise<number>} 削除した件数
+   */
+  async function pruneOldestImages(targetBytes) {
+    const db = await openImageDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.openCursor();
+      let total = 0;
+      const keysToCheck = [];
+
+      // まずすべてのキーとサイズを列挙
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (cursor) {
+          const size = typeof cursor.value === "string" ? cursor.value.length * 2 : 0;
+          total += size;
+          keysToCheck.push({ key: cursor.key, size });
+          cursor.continue();
+        } else {
+          // totalが目標以下なら削除不要
+          if (total <= targetBytes) { resolve(0); return; }
+          // 古い順（先頭）から削除
+          let deletedCount = 0;
+          let current = total;
+          const deleteNext = () => {
+            if (current <= targetBytes || keysToCheck.length === 0) {
+              resolve(deletedCount);
+              return;
+            }
+            const item = keysToCheck.shift();
+            const delReq = store.delete(item.key);
+            delReq.onsuccess = () => {
+              current -= item.size;
+              deletedCount++;
+              deleteNext();
+            };
+            delReq.onerror = () => resolve(deletedCount);
+          };
+          deleteNext();
+        }
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /**
+   * メッセージ配列内の imageData を IndexedDB にオフロードする
+   * imageData が "data:" で始まる場合は IDB に保存し、参照キー "idb:<msgId>" に置換
+   * @param {StoredMessage[]} msgs
+   * @returns {Promise<StoredMessage[]>} imageData が idb: 参照に置き換わったコピー
+   */
+  async function offloadImagesToIdb(msgs) {
+    const result = [];
+    for (const m of msgs) {
+      if (m.imageData && m.imageData.startsWith("data:")) {
+        const key = m.id || generateMsgId();
+        try {
+          await saveImageToIdb(key, m.imageData);
+          result.push({ ...m, imageData: "idb:" + key });
+        } catch (e) {
+          console.warn("[IDB] 画像保存失敗:", e);
+          result.push(m); // フォールバック: そのまま保持
+        }
+      } else {
+        result.push(m);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * メッセージ配列内の "idb:<key>" 参照を実データに復元する
+   * @param {StoredMessage[]} msgs
+   * @returns {Promise<StoredMessage[]>}
+   */
+  async function rehydrateImagesFromIdb(msgs) {
+    const result = [];
+    for (const m of msgs) {
+      if (m.imageData && m.imageData.startsWith("idb:")) {
+        const key = m.imageData.slice(4);
+        try {
+          const data = await getImageFromIdb(key);
+          result.push({ ...m, imageData: data || m.imageData });
+        } catch (e) {
+          console.warn("[IDB] 画像復元失敗:", e);
+          result.push(m);
+        }
+      } else {
+        result.push(m);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * ストレージ容量チェック（警告・自動削除）
+   * persistHistory 完了後に非同期で呼ぶ
+   */
+  async function checkImageStorageQuota() {
+    try {
+      const totalBytes = await getIdbImagesTotalSize();
+      const totalMB = totalBytes / (1024 * 1024);
+
+      if (totalMB > LIMITS.IDB_IMAGE_MAX_MB) {
+        const target = LIMITS.IDB_IMAGE_WARN_MB * 1024 * 1024;
+        const deleted = await pruneOldestImages(target);
+        notify(`⚠️ 画像容量が${LIMITS.IDB_IMAGE_MAX_MB}MBを超えたため、古い画像${deleted}件を自動削除しました`);
+      } else if (totalMB > LIMITS.IDB_IMAGE_WARN_MB) {
+        notify(`⚠️ 画像ストレージ使用量: ${totalMB.toFixed(0)}MB / ${LIMITS.IDB_IMAGE_MAX_MB}MB`);
+      }
+    } catch (e) {
+      console.warn("[IDB] 容量チェック失敗:", e);
+    }
+  }
 
   // /v1/models から取得したIDのうち、埋め込み系を除外するためのキーワード
   const EMBEDDING_KEYWORDS = Object.freeze(["embed", "embedding", "bge", "e5-", "gte-", "jina"]);
@@ -214,6 +449,7 @@
     showSamplePrompts: true, // プロンプト集ボタンの表示
     hideThinking: false,     // 思考プロセス表示を非表示
     disableThinking: false,  // Thinkingモード無効化（Qwen等）
+    persistApiKey: false,    // API鍵をlocalStorageに保存するか（falseならsessionStorageのみ）
   });
 
   // ---------------------------------------------------------------------------
@@ -255,6 +491,7 @@
     showSamplePromptsToggle: document.getElementById("showSamplePromptsToggle"),
     hideThinkingToggle: document.getElementById("hideThinkingToggle"),
     disableThinkingToggle: document.getElementById("disableThinkingToggle"),
+    persistApiKeyToggle: document.getElementById("persistApiKeyToggle"),
     samplePromptsBtn: document.getElementById("samplePromptsBtn"),
 
     // v1.7.2: 医学用語チェックモーダル
@@ -707,9 +944,14 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
   function loadSettings() {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS) || "{}";
     const s = safeJSONParse(raw, {});
+    const persistApiKey = Boolean(s.persistApiKey);
+    // API鍵: persistApiKey=true → localStorageから読む / false → sessionStorageから読む
+    const apiKey = persistApiKey
+      ? (s.apiKey || DEFAULT_SETTINGS.apiKey)
+      : (sessionStorage.getItem("localLLMChat_apiKey") || s.apiKey || DEFAULT_SETTINGS.apiKey);
     return /** @type {Settings} */ ({
       baseUrl: s.baseUrl || DEFAULT_SETTINGS.baseUrl,
-      apiKey: s.apiKey || DEFAULT_SETTINGS.apiKey,
+      apiKey,
       model: s.model,
       temperature: (typeof s.temperature === "number") ? s.temperature : DEFAULT_SETTINGS.temperature,
       maxTokens: (typeof s.maxTokens === "number") ? s.maxTokens : DEFAULT_SETTINGS.maxTokens,
@@ -728,6 +970,7 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
       showSamplePrompts: s.showSamplePrompts !== false, // デフォルトtrue
       hideThinking: Boolean(s.hideThinking),
       disableThinking: Boolean(s.disableThinking),
+      persistApiKey: Boolean(s.persistApiKey),
     });
   }
 
@@ -786,13 +1029,18 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     if (el.disableThinkingToggle) {
       el.disableThinkingToggle.checked = Boolean(settings.disableThinking);
     }
+    if (el.persistApiKeyToggle) {
+      el.persistApiKeyToggle.checked = Boolean(settings.persistApiKey);
+    }
   }
 
   /** UI → settingsへ反映し保存 */
   function saveSettingsFromUI() {
+    const persistApiKey = el.persistApiKeyToggle?.checked || false;
+    const apiKeyValue = el.apiKey.value.trim();
     settings = {
       baseUrl: el.baseUrl.value.trim(),
-      apiKey: el.apiKey.value.trim(),
+      apiKey: apiKeyValue,
       model: el.modelSelect.value,
       temperature: parseFloat(el.temperature.value),
       maxTokens: parseInt(el.maxTokens.value, 10),
@@ -811,8 +1059,19 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
       showSamplePrompts: el.showSamplePromptsToggle?.checked !== false,
       hideThinking: el.hideThinkingToggle?.checked || false,
       disableThinking: el.disableThinkingToggle?.checked || false,
+      persistApiKey,
     };
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    // API鍵の保存先を分岐
+    const toSave = { ...settings };
+    if (persistApiKey) {
+      // localStorageに保存、sessionStorageはクリア
+      sessionStorage.removeItem("localLLMChat_apiKey");
+    } else {
+      // sessionStorageに保存、localStorageからは除外
+      sessionStorage.setItem("localLLMChat_apiKey", apiKeyValue);
+      delete toSave.apiKey;
+    }
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(toSave));
   }
 
   /** @returns {StoredMessage[]} */
@@ -840,10 +1099,33 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     messages = cleaned;
   }
 
+  /** 非同期画像オフロードのキュー制御 */
+  let _persistQueue = Promise.resolve();
+
   function persistHistory() {
     sanitizeMessages();
+    // 同期: まず imageData をそのまま保存（フォールバック）
     localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(messages));
     syncCurrentSession();
+
+    // 非同期: 画像を IndexedDB にオフロードし、localStorage を軽量化
+    _persistQueue = _persistQueue.then(async () => {
+      try {
+        const offloaded = await offloadImagesToIdb(messages);
+        // messages 内の imageData を idb: 参照に置換
+        for (let i = 0; i < messages.length; i++) {
+          if (offloaded[i] && offloaded[i].imageData !== messages[i].imageData) {
+            messages[i].imageData = offloaded[i].imageData;
+          }
+        }
+        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(messages));
+        syncCurrentSession();
+        // 容量チェック（バックグラウンド）
+        checkImageStorageQuota();
+      } catch (e) {
+        console.warn("[IDB] 画像オフロード失敗（localStorageにフォールバック）:", e);
+      }
+    });
   }
 
   function loadCustomPresets() {
@@ -923,6 +1205,10 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
 
     // すべてのlocalStorageキーを削除
     Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+    // sessionStorage（API鍵等）も削除
+    sessionStorage.removeItem("localLLMChat_apiKey");
+    // IndexedDB画像も削除
+    clearAllImagesFromIdb().catch(e => console.warn("[IDB] 画像削除失敗:", e));
 
     // 状態をリセット
     messages = [];
@@ -1240,6 +1526,22 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
       messages = current.history || [];
       messages.forEach(m => { if (!m.id) m.id = generateMsgId(); });
       localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(messages));
+
+      // 非同期: IndexedDB から画像を復元
+      rehydrateImagesFromIdb(messages).then(hydrated => {
+        messages = hydrated;
+        // 画像を含むメッセージのDOM要素を更新
+        hydrated.forEach(m => {
+          if (m.imageData && !m.imageData.startsWith("idb:")) {
+            const msgEl = document.querySelector(`[data-msg-id="${m.id}"]`);
+            if (msgEl) {
+              msgEl.dataset.imageData = m.imageData;
+              const img = msgEl.querySelector("img.image-in-message");
+              if (img) img.src = m.imageData;
+            }
+          }
+        });
+      }).catch(e => console.warn("[IDB] 画像復元失敗:", e));
     }
   }
 
@@ -1333,6 +1635,21 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
       messages.forEach(m => appendMessage(m.role, m.content, { save: false, imageData: m.imageData || null, msgId: m.id }));
     }
     renderSessionList();
+
+    // 非同期: IndexedDB から画像を復元
+    rehydrateImagesFromIdb(messages).then(hydrated => {
+      messages = hydrated;
+      hydrated.forEach(m => {
+        if (m.imageData && !m.imageData.startsWith("idb:")) {
+          const msgEl = document.querySelector(`[data-msg-id="${m.id}"]`);
+          if (msgEl) {
+            msgEl.dataset.imageData = m.imageData;
+            const img = msgEl.querySelector("img.image-in-message");
+            if (img) img.src = m.imageData;
+          }
+        }
+      });
+    }).catch(e => console.warn("[IDB] 画像復元失敗:", e));
   }
 
   /**
@@ -1341,6 +1658,16 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
    */
   function deleteSession(sessionId) {
     if (!confirm("このセッションを削除しますか？")) return;
+
+    // 削除対象セッションの画像を IndexedDB からも削除
+    const toDelete = sessions.find(s => s.id === sessionId);
+    if (toDelete && toDelete.history) {
+      for (const m of toDelete.history) {
+        if (m.imageData && m.imageData.startsWith("idb:")) {
+          deleteImageFromIdb(m.imageData.slice(4)).catch(() => {});
+        }
+      }
+    }
 
     sessions = sessions.filter(s => s.id !== sessionId);
 
@@ -1500,8 +1827,18 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     // user画像添付はメッセージ内にも表示
     if (imageData && role === "user") {
       const img = document.createElement("img");
-      img.src = imageData;
       img.classList.add("image-in-message");
+      if (imageData.startsWith("idb:")) {
+        // IndexedDB から非同期で復元
+        img.alt = "読込中…";
+        const idbKey = imageData.slice(4);
+        getImageFromIdb(idbKey).then(data => {
+          if (data) { img.src = data; container.dataset.imageData = data; }
+          else img.alt = "画像が見つかりません";
+        }).catch(() => { img.alt = "画像読込エラー"; });
+      } else {
+        img.src = imageData;
+      }
       container.appendChild(img);
     }
 
@@ -1511,7 +1848,7 @@ A: 「🗑️ クリア」ボタンで画面の会話が消え、最初の状態
     if (role === "assistant") {
       const { thinking, main, isPartial } = extractThinkingBlocks(content);
       const thinkingHtml = renderThinkingHtml(thinking, isPartial);
-      body.innerHTML = thinkingHtml + marked.parse(main);
+      body.innerHTML = thinkingHtml + safeMarkdown(main);
     } else {
       body.textContent = content;
     }
@@ -1874,8 +2211,8 @@ ${APP_MANUAL_CONTENT}
       if (!["user", "assistant"].includes(m.role)) continue;
       if (m.role === last) continue;
 
-      // Vision API形式に変換（user画像のみ）
-      if (m.role === "user" && m.imageData) {
+      // Vision API形式に変換（user画像のみ、idb:参照はスキップ）
+      if (m.role === "user" && m.imageData && !m.imageData.startsWith("idb:")) {
         const contentArray = [];
         if (m.content) contentArray.push({ type: "text", text: m.content });
         contentArray.push({ type: "image_url", image_url: { url: m.imageData } });
@@ -2289,6 +2626,22 @@ ${APP_MANUAL_CONTENT}
     return div.innerHTML;
   }
 
+  /**
+   * marked.parse() + DOMPurify でサニタイズされたHTMLを返す
+   * @param {string} md - Markdownテキスト
+   * @returns {string} サニタイズ済みHTML
+   */
+  function safeMarkdown(md) {
+    const raw = marked.parse(md);
+    if (typeof DOMPurify !== "undefined") {
+      return DOMPurify.sanitize(raw, {
+        ADD_TAGS: ["details", "summary"],
+        ADD_ATTR: ["open"],
+      });
+    }
+    return raw;
+  }
+
   // ---------------------------------------------------------------------------
   // Compare Mode Send (v1.7.0)
   // ---------------------------------------------------------------------------
@@ -2436,7 +2789,7 @@ ${APP_MANUAL_CONTENT}
             const contentEl = msgEl.querySelector(".message-content");
             if (contentEl) {
               const { thinking, main, isPartial } = extractThinkingBlocks(content);
-              contentEl.innerHTML = renderThinkingHtml(thinking, isPartial) + marked.parse(main);
+              contentEl.innerHTML = renderThinkingHtml(thinking, isPartial) + safeMarkdown(main);
             }
             smartScrollToBottom();
           },
@@ -2444,7 +2797,7 @@ ${APP_MANUAL_CONTENT}
             const contentEl = msgEl.querySelector(".message-content");
             if (contentEl) {
               const { thinking, main } = extractThinkingBlocks(content || "(空応答)");
-              contentEl.innerHTML = renderThinkingHtml(thinking, false) + marked.parse(main || "(空応答)");
+              contentEl.innerHTML = renderThinkingHtml(thinking, false) + safeMarkdown(main || "(空応答)");
             }
           }
         );
@@ -2454,7 +2807,7 @@ ${APP_MANUAL_CONTENT}
         const contentEl = msgEl.querySelector(".message-content");
         if (e && e.name === "AbortError") {
           const currentContent = updateContent(null);
-          if (contentEl) contentEl.innerHTML = marked.parse(currentContent + "\n\n⏹ **生成を停止しました。**");
+          if (contentEl) contentEl.innerHTML = safeMarkdown(currentContent + "\n\n⏹ **生成を停止しました。**");
         } else {
           if (contentEl) contentEl.textContent = `エラー: ${e?.message || e}`;
         }
@@ -2648,7 +3001,7 @@ ${APP_MANUAL_CONTENT}
           const { thinking, main, isPartial } = extractThinkingBlocks(isFinal ? (displayContent || "(空応答)") : displayContent);
           const thinkingHtml = renderThinkingHtml(thinking, isPartial);
 
-          contentEl.innerHTML = thinkingHtml + marked.parse(main || (isFinal ? "(空応答)" : ""));
+          contentEl.innerHTML = thinkingHtml + safeMarkdown(main || (isFinal ? "(空応答)" : ""));
         }
 
         await consumeSSE(
@@ -2691,7 +3044,7 @@ ${APP_MANUAL_CONTENT}
 
       if (e && e.name === "AbortError") {
         const stoppedContent = currentContent + "\n\n⏹ **生成を停止しました。**";
-        if (contentEl) contentEl.innerHTML = marked.parse(stoppedContent);
+        if (contentEl) contentEl.innerHTML = safeMarkdown(stoppedContent);
         // ★ 停止時もユーザーメッセージと途中の応答を履歴に保存（Edit/Regenerate対応）
         currentMsgDiv.dataset.content = stoppedContent;
         messages.push(userMessageForHistory);
@@ -2704,7 +3057,7 @@ ${APP_MANUAL_CONTENT}
       } else {
         // 生成途中でのエラーは内容を保持してエラーを追記
         const errorMsg = `\n\n⚠️ **エラーが発生しました**: ${e?.message || e}`;
-        if (contentEl) contentEl.innerHTML = marked.parse(currentContent + errorMsg);
+        if (contentEl) contentEl.innerHTML = safeMarkdown(currentContent + errorMsg);
         console.error("Streaming error:", e);
 
         // 部分的なコンテンツがある場合は履歴に保存（再生成・編集対応）
@@ -2831,9 +3184,9 @@ AI応答テキスト:
       contentHtml = "<ul style='margin:0;padding-left:20px'>";
       for (const issue of checkResult.issues) {
         contentHtml += `<li style="margin-bottom:8px">
-          <strong style="color:#dc3545">${issue.original}</strong> →
-          <strong style="color:#28a745">${issue.suggested}</strong>
-          ${issue.reason ? `<br><small style="color:#666">${issue.reason}</small>` : ""}
+          <strong style="color:#dc3545">${escapeHtml(issue.original || "")}</strong> →
+          <strong style="color:#28a745">${escapeHtml(issue.suggested || "")}</strong>
+          ${issue.reason ? `<br><small style="color:#666">${escapeHtml(issue.reason)}</small>` : ""}
         </li>`;
       }
       contentHtml += "</ul>";
@@ -3168,17 +3521,19 @@ AI応答テキスト:
     el.attachmentList.style.display = "block";
     el.attachmentList.innerHTML = attachments.map(att => {
       const sizeStr = formatFileSize(att.size);
+      const safeName = escapeHtml(att.name);
+      const safeId = escapeHtml(att.id);
 
       // 画像の場合はサムネイルを表示
       if (att.type === "image") {
         return `
           <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee">
-            <img src="${att.data}" alt="${att.name}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #ddd;flex-shrink:0" />
+            <img src="${att.data}" alt="${safeName}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #ddd;flex-shrink:0" />
             <div style="flex:1;min-width:0">
-              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${att.name}">${att.name}</div>
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${safeName}">${safeName}</div>
               <div style="color:#666;font-size:0.8em">${sizeStr}</div>
             </div>
-            <button onclick="window._removeAttachment('${att.id}')" style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.85em;flex-shrink:0">×</button>
+            <button onclick="window._removeAttachment('${safeId}')" style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.85em;flex-shrink:0">×</button>
           </div>
         `;
       }
@@ -3188,10 +3543,10 @@ AI応答テキスト:
         <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee">
           <span style="font-size:1.5em;flex-shrink:0">📄</span>
           <div style="flex:1;min-width:0">
-            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${att.name}">${att.name}</div>
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${safeName}">${safeName}</div>
             <div style="color:#666;font-size:0.8em">${sizeStr}</div>
           </div>
-          <button onclick="window._removeAttachment('${att.id}')" style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.85em;flex-shrink:0">×</button>
+          <button onclick="window._removeAttachment('${safeId}')" style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:0.85em;flex-shrink:0">×</button>
         </div>
       `;
     }).join("");
@@ -3741,6 +4096,9 @@ AI応答テキスト:
     if (el.disableThinkingToggle) {
       el.disableThinkingToggle.onchange = save;
     }
+    if (el.persistApiKeyToggle) {
+      el.persistApiKeyToggle.onchange = save;
+    }
 
     // v1.7.2: System Promptプリセット
     if (el.systemPromptPresetSelect) {
@@ -4166,6 +4524,9 @@ AI応答テキスト:
   }
 
   async function init() {
+    // IndexedDB 初期化（画像オフロード用）
+    openImageDb().catch(e => console.warn("[IDB] 初期化失敗:", e));
+
     // 旧バージョンからのデータ移行
     migrateStorageKeys();
 
