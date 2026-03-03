@@ -2,52 +2,52 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>Local LLM Chat v1.8.1</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="./assets/app.css?v=1.8.1" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Local LLM Chat — JRC2026 Edition</title>
+<link rel="stylesheet" href="assets/app.css" />
+<link rel="stylesheet" href="assets/katex.min.css" />
 <script src="./assets/marked.min.js"></script>
 <script src="./assets/pdf.min.js"></script>
 <script>
-  if (typeof pdfjsLib !== 'undefined') {
-    if (location.protocol === 'file:') {
-      // file:// プロトコルでは Web Worker が使えないため
-      // worker スクリプトをメインスレッドに同期読み込み（globalThis.pdfjsWorker が設定される）
-      document.write('<scr' + 'ipt src="./assets/pdf.worker.min.js"></scr' + 'ipt>');
-    } else {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = './assets/pdf.worker.min.js';
+  // ★ v1.6.3互換: 外部ファイル読み込みの失敗を防ぐため、最低限のCSS/JSフォールバック
+  window.onerror = function(msg, url, line) {
+    if (msg.includes && msg.includes("marked")) {
+      console.warn("[LLM Chat] marked.js 読込失敗。CDN fallback を試みます。");
+      var s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+      document.head.appendChild(s);
     }
   }
 </script>
 </head>
 <body>
 <header>
-  <div class="row" style="justify-content:center;text-align:center;width:100%">
-    <strong style="font-size:1.3em">Local LLM Chat</strong>
-  </div>
-  <div class="row">
-    <span>モデル:</span>
-    <select id="modelSelect" title="クリックでモデル一覧を更新">
-      <!-- クリック時に自動更新 -->
-    </select>
-    <span id="compareRow" style="display:none">
-      <span style="margin-left:16px">比較:</span>
-      <select id="compareModelSelect" title="比較対象のモデルを選択">
-        <!-- 比較モード時に表示 -->
-      </select>
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;width:100%">
+    <span></span>
+    <strong style="font-size:1.3em;text-align:center">Local LLM Chat</strong>
+    <span style="text-align:right">
+      <button id="samplePromptsBtn" title="サンプルプロンプト集を別タブで開く" style="border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.85);font-size:0.85em" onclick="window.open('SAMPLE_PROMPTS.html','_blank')">📖 プロンプト集</button>
     </span>
   </div>
-  <div class="row" style="justify-content:flex-end;gap:6px">
-    <!-- 会話操作 -->
-    <button id="newTopicBtn" title="AIの記憶をリセットして新しい話題を始める（画面はそのまま）" class="btn-new-topic">🔄 話題リセット</button>
-    <button id="clearBtn" title="画面の会話をすべて消去する" class="btn-clear">🗑️ クリア</button>
-    <span style="border-left:1px solid rgba(255,255,255,0.3);height:24px;margin:0 4px"></span>
-    <!-- 比較モード -->
-    <button id="compareBtn" title="2つのモデルの回答を比較" style="border:2px solid #6f42c1;background:#fff;color:#6f42c1">⚖️ 比較</button>
-    <span style="border-left:1px solid rgba(255,255,255,0.3);height:24px;margin:0 4px"></span>
-    <!-- システム -->
-    <button id="samplePromptsBtn" title="プロンプト集を表示" style="border:2px solid #17a2b8;background:#fff;color:#17a2b8">📖</button>
-    <button id="helpBtn" title="ヘルプを表示" style="border:2px solid #fd7e14;background:#fff;color:#fd7e14">❓</button>
-    <button id="settingsBtn" title="設定">⚙️</button>
+  <div class="row" style="justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;width:100%">
+    <span style="display:flex;align-items:center;gap:6px">
+      <span>モデル:</span>
+      <select id="modelSelect" title="クリックでモデル一覧を更新">
+        <!-- クリック時に自動更新 -->
+      </select>
+      <span id="compareRow" style="display:none">
+        <span style="margin-left:16px">比較:</span>
+        <select id="compareModelSelect" title="比較対象のモデルを選択">
+          <!-- 比較モード時に表示 -->
+        </select>
+      </span>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px">
+      <button id="clearBtn" title="画面の会話をすべて消去する" class="btn-clear">🗑️ クリア</button>
+      <button id="compareBtn" title="2つのモデルの回答を比較" style="border:2px solid #6f42c1;background:#fff;color:#6f42c1">⚖️ 比較</button>
+      <button id="helpBtn" title="ヘルプを表示" style="border:2px solid #fd7e14;background:#fff;color:#fd7e14">❓</button>
+      <button id="settingsBtn" title="設定">⚙️</button>
+    </span>
   </div>
 </header>
 
@@ -55,8 +55,8 @@
   <!-- タブナビゲーション -->
   <div class="settings-tabs">
     <button class="settings-tab active" data-tab="tab-basic">⚙️ 基本</button>
+    <button class="settings-tab" data-tab="tab-model">🤖 モデル</button>
     <button class="settings-tab" data-tab="tab-prompt">💬 プロンプト</button>
-    <button class="settings-tab" data-tab="tab-model">👁️ モデル</button>
     <button class="settings-tab" data-tab="tab-data">📂 データ</button>
   </div>
 
@@ -68,16 +68,10 @@
           <label><input type="checkbox" id="darkModeToggle" /> 🌙 Dark Mode</label>
         </div>
         <div class="settings-row">
-          <label><input type="checkbox" id="autoUnloadToggle" /> 🔄 自動アンロード</label>
-        </div>
-        <div class="settings-row">
           <label><input type="checkbox" id="showWelcomeToggle" checked /> 🏠 起動時にオープニング画面を表示</label>
         </div>
         <div class="settings-row">
-          <label><input type="checkbox" id="hideThinkingToggle" /> 💭 思考プロセスを非表示</label>
-        </div>
-        <div class="settings-row">
-          <label><input type="checkbox" id="disableThinkingToggle" /> 🚫 Thinkingモード無効化<small style="color:#888;margin-left:4px">（Qwen等）</small></label>
+          <label><input type="checkbox" id="showSamplePromptsToggle" checked /> 📖 プロンプト集ボタンを表示</label>
         </div>
         <div class="settings-row">
           <label>送信キー:</label>
@@ -86,43 +80,6 @@
             <option value="ctrl-enter">Ctrl+Enter で送信</option>
           </select>
         </div>
-        <div class="settings-row">
-          <label>応答スタイル:</label>
-          <select id="responseStyle">
-            <option value="concise">簡潔（要点のみ）</option>
-            <option value="standard" selected>標準（バランス型）</option>
-            <option value="detailed">詳細（詳しい説明付き）</option>
-            <option value="professional">専門的（技術的詳細重視）</option>
-          </select>
-        </div>
-      </div>
-      <div class="settings-col">
-        <div class="settings-row">
-          <label>Temperature:</label>
-          <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />
-          <span id="tempValue">0.7</span>
-        </div>
-        <div class="settings-row">
-          <label>Max Tokens:</label>
-          <input type="number" id="maxTokens" min="1" max="8192" value="2048" />
-        </div>
-        <div class="settings-row">
-          <label>Reasoning Effort:</label>
-          <select id="reasoningEffort">
-            <option value="">指定なし</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label>🔗 Base URL:</label>
-          <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:200px" />
-        </div>
-        <div class="settings-row">
-          <label>🔑 API Key:</label>
-          <input type="text" id="apiKey" value="lmstudio" style="width:130px" />
-        </div>
       </div>
     </div>
     <div class="settings-section-border"></div>
@@ -130,11 +87,11 @@
     <div class="settings-columns">
       <div class="settings-col">
         <div class="settings-row">
-          <label>呼び名:</label>
+          <label>AIがあなたを呼ぶ名前:</label>
           <input type="text" id="userName" placeholder="例: 田中先生" style="width:160px" />
         </div>
         <div class="settings-row">
-          <label>専門レベル:</label>
+          <label>あなたの専門レベル:</label>
           <select id="userLevel">
             <option value="">指定なし</option>
             <option value="beginner">初心者</option>
@@ -194,6 +151,64 @@
 
   <!-- ===== モデルタブ ===== -->
   <div class="settings-tab-content" id="tab-model">
+    <div class="settings-row"><label>🔧 LLM パラメータ</label></div>
+    <div class="settings-columns">
+      <div class="settings-col">
+        <div class="settings-row">
+          <label>応答スタイル:</label>
+          <select id="responseStyle">
+            <option value="concise">簡潔</option>
+            <option value="standard" selected>標準</option>
+            <option value="detailed">詳細</option>
+            <option value="professional">専門的</option>
+          </select>
+          <label style="margin-left:12px">言語:</label>
+          <select id="responseLanguage">
+            <option value="" selected>自動</option>
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+            <option value="ko">한국어</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label>Temperature:</label>
+          <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />
+          <span id="tempValue">0.7</span>
+        </div>
+      </div>
+      <div class="settings-col">
+        <div class="settings-row">
+          <label>Max Tokens:</label>
+          <input type="number" id="maxTokens" min="1" max="8192" value="2048" />
+        </div>
+        <div class="settings-row">
+          <label>Reasoning Effort:</label>
+          <select id="reasoningEffort">
+            <option value="">指定なし</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label><input type="checkbox" id="hideThinkingToggle" /> 🧠 思考プロセスを非表示</label>
+    </div>
+    <div class="settings-row">
+      <label><input type="checkbox" id="disableThinkingToggle" /> 🚫 Thinkingモード無効化<small style="color:#888;margin-left:4px">（Qwen等）</small></label>
+    </div>
+    <div class="settings-section-border"></div>
+    <div class="settings-row">
+      <label>🔗 Base URL:</label>
+      <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:200px" />
+    </div>
+    <input type="hidden" id="apiKey" value="lmstudio" />
+    <div class="settings-row">
+      <label><input type="checkbox" id="autoUnloadToggle" /> 🔄 モデル切替時に自動アンロード</label>
+    </div>
+    <div class="settings-section-border"></div>
     <div class="settings-row">
       <label>👁️ 表示モデル管理</label>
       <span id="modelVisibilityCount" style="font-size:0.85em;color:#666">表示対象: 0 / 0</span>
@@ -216,6 +231,9 @@
     <div class="settings-row">
       <button id="resetSettingsBtn" style="background:#ffc107;color:#000">🔄 設定をデフォルトに戻す</button>
       <button id="clearAllDataBtn" style="background:#dc3545">🗑 すべての保存データを消す</button>
+    </div>
+    <div style="font-size:0.8em;color:#888;margin-top:2px;line-height:1.5">
+      ※「すべての保存データを消す」を実行すると、会話履歴・設定・プリセット・セッションなど、このアプリの全データが初期化されます。
     </div>
   </div>
 
@@ -283,19 +301,26 @@
   </div>
 </div>
 
-<!-- プロンプト集モーダル -->
-<div id="samplePromptsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center">
-  <div style="background:#fff;border-radius:12px;width:90%;max-width:700px;height:80vh;display:flex;flex-direction:column;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #eee">
-      <h3 style="margin:0;color:#333">📖 プロンプト集</h3>
-      <button id="samplePromptsCloseBtn" style="padding:6px 14px;border:none;background:#6c757d;color:#fff;border-radius:6px;cursor:pointer">閉じる</button>
+<!-- キーボードショートカットモーダル -->
+<div id="shortcutsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center">
+  <div class="shortcuts-content">
+    <h3 class="shortcuts-title">⌨️ キーボードショートカット</h3>
+    <table class="shortcuts-table">
+      <tr><td><kbd>Enter</kbd> / <kbd>Ctrl+Enter</kbd></td><td>送信（設定による）</td></tr>
+      <tr><td><kbd>Shift+Enter</kbd></td><td>改行</td></tr>
+      <tr><td><kbd>Ctrl/⌘</kbd> + <kbd>V</kbd></td><td>画像ペースト</td></tr>
+      <tr><td><kbd>Ctrl/⌘</kbd> + <kbd>K</kbd></td><td>履歴クリア</td></tr>
+      <tr><td><kbd>Ctrl/⌘</kbd> + <kbd>/</kbd></td><td>ショートカット一覧</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>パネルを閉じる</td></tr>
+    </table>
+    <div style="text-align:right;margin-top:16px">
+      <button id="shortcutsCloseBtn" style="padding:8px 16px;border:none;background:#6c757d;color:#fff;border-radius:6px;cursor:pointer">閉じる</button>
     </div>
-    <iframe id="samplePromptsFrame" src="" title="プロンプト集" style="flex:1;border:none;border-radius:0 0 12px 12px"></iframe>
   </div>
 </div>
 
-<div id="version-badge" style="position:fixed;bottom:8px;right:12px;font-size:0.75em;color:#999;pointer-events:none;z-index:1">v1.8.1</div>
+<div id="version-badge" style="position:fixed;bottom:8px;right:12px;font-size:0.75em;color:#999;pointer-events:none;z-index:1">v1.8.0</div>
 
-<script src="./js/app.js?v=1.8.1"></script>
+<script src="./js/app.js?v=1.8.0"></script>
 </body>
 </html>

@@ -6,11 +6,14 @@
 
 Local LLM Chatは、ローカルで動作するLLMサーバー（LM Studio、Ollamaなど）と連携するWebベースのチャットインターフェースです。
 
-## 開発方針（2025-12-23更新）
+## 開発方針（2026-03-04更新）
 
-**アクティブ開発版**: `lmstudio_chat_v1.6.3/` - 今後の改良・修正はこのバージョンで行う
+**アクティブ開発版**: `Local_LLM_Chat_JRC2026_preview/` - JRC2026配布版ベースに最小限の機能追加
 
 **保持版（変更しない）**:
+- `Local_LLM_Chat_JRC2026_old/` - 元のJRC2026配布版（v1.8.0）
+- `local_llm_chat_v1.8.2/` - v1.8.0+JRC2026マージ版（開発停止、参照用）
+- `local_llm_chat_v1.8.0/` - v1.8.1（開発版、参照用）
 - `local_llm_chat_v2.1/` - モジュール分割版（参照用として保持）
 - `lmstudio_chat_v1.5/` - v1.6のベース版
 
@@ -61,6 +64,9 @@ local_llm_chat_v2.1/
 ├── css/                        # スタイルシート（8ファイル）
 └── js/                         # JavaScriptモジュール（17ファイル）
 ```
+
+### Standalone 版（シングルバイナリ配布用）
+- `local_llm_chat_standalone/` - v1.8.0 とは別の新規バージョン。Bun で HTML/CSS/JS を1つの実行ファイルにまとめ、Mac/Windows 用にビルド可能。README.md・BUN.md あり。
 
 ### レガシー版（参照用）
 - `lmstudio_chat_v1.5/` - v1.6のベース版

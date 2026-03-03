@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回答を良くするテクニック集 — JRC 2026</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Helvetica Neue","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:#0f0f23;color:#e0e0f0;line-height:1.7;padding:0;
+}
+.layout{display:flex;min-height:100vh}
+nav.sidebar{
+  position:sticky;top:0;height:100vh;width:260px;min-width:260px;
+  background:#12122a;border-right:1px solid #2a2a4a;
+  overflow-y:auto;padding:16px 0;font-size:13px;
+}
+nav.sidebar::-webkit-scrollbar{width:4px}
+nav.sidebar::-webkit-scrollbar-thumb{background:#333}
+nav.sidebar .nav-title{
+  font-size:14px;font-weight:700;color:#00d4ff;
+  padding:8px 16px 12px;border-bottom:1px solid #2a2a4a;margin-bottom:8px;
+}
+nav.sidebar a{
+  display:block;padding:6px 16px;color:#b0b0c0;text-decoration:none;
+  border-left:3px solid transparent;transition:all .15s;
+}
+nav.sidebar a:hover,nav.sidebar a.active{
+  color:#fff;background:#1a1a35;border-left-color:#007bff;
+}
+nav.sidebar a.sub{padding-left:28px;font-size:12px;color:#8888a0}
+nav.sidebar a.sub:hover{color:#ccc}
+main{flex:1;max-width:900px;padding:32px 40px 60px;margin:0 auto}
+h1{font-size:28px;color:#fff;margin-bottom:4px}
+.subtitle{font-size:14px;color:#00d4ff;margin-bottom:24px}
+.intro{font-size:14px;color:#b0b0c0;margin-bottom:32px;line-height:1.8}
+h2{
+  font-size:22px;color:#fff;margin:40px 0 8px;padding-top:20px;
+  border-bottom:2px solid #007bff;padding-bottom:8px;
+}
+h3{font-size:17px;color:#00d4ff;margin:24px 0 8px}
+p{margin:8px 0;color:#c8c8d8;font-size:14.5px}
+strong{color:#fff}
+hr{border:none;border-top:1px solid #2a2a4a;margin:28px 0}
+blockquote{
+  border-left:3px solid #007bff;padding:10px 16px;margin:12px 0;
+  background:#1a1a30;border-radius:4px;color:#c0c0d0;font-size:13.5px;
+}
+ul,ol{margin:8px 0 8px 24px;color:#c8c8d8;font-size:14px}
+li{margin:4px 0}
+.prompt-card{
+  position:relative;background:#1a1a2e;border:1px solid #2a2a4a;
+  border-radius:8px;margin:12px 0 20px;overflow:hidden;
+}
+.prompt-card pre{
+  margin:0;padding:16px 16px 16px 16px;
+  font-family:"SF Mono","Fira Code","Consolas",monospace;
+  font-size:13.5px;line-height:1.65;color:#e8e8f8;
+  white-space:pre-wrap;word-wrap:break-word;
+  overflow-x:auto;
+}
+.copy-btn{
+  position:absolute;top:8px;right:8px;
+  background:#007bff;color:#fff;border:none;border-radius:5px;
+  padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .2s;z-index:2;
+}
+.copy-btn:hover{background:#0062d6}
+.copy-btn.copied{background:#28a745}
+.tips{
+  background:#1e1e38;border:1px solid #2a2a4a;border-radius:8px;
+  padding:20px 24px;margin:20px 0;
+}
+.tips li{margin:6px 0}
+footer{text-align:center;color:#666;font-size:12px;padding:20px;margin-top:40px}
+@media(max-width:800px){
+  nav.sidebar{display:none}
+  main{padding:20px 16px}
+}
+/* --- password gate --- */
+#pw-gate{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;background:#0f0f23;
+}
+#pw-box{
+  background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;
+  padding:40px 48px;text-align:center;max-width:400px;width:90%;
+}
+#pw-box h2{
+  font-size:20px;color:#fff;border:none;margin:0 0 8px;padding:0;
+}
+#pw-box p{color:#888;font-size:13px;margin-bottom:24px}
+#pw-input{
+  width:100%;padding:12px 16px;font-size:15px;
+  background:#12122a;color:#e0e0f0;border:1px solid #2a2a4a;
+  border-radius:6px;outline:none;text-align:center;
+  letter-spacing:2px;
+}
+#pw-input:focus{border-color:#007bff}
+#pw-input::placeholder{letter-spacing:0;color:#555}
+#pw-btn{
+  margin-top:16px;padding:10px 32px;font-size:14px;font-weight:600;
+  background:#007bff;color:#fff;border:none;border-radius:6px;
+  cursor:pointer;transition:background .2s;
+}
+#pw-btn:hover{background:#0062d6}
+#pw-error{color:#ff4444;font-size:13px;margin-top:12px;display:none}
+#protected-content{display:none}
+</style>
+</head>
+<body>
+
+<!-- ===== Password Gate ===== -->
+<div id="pw-gate">
+  <div id="pw-box">
+    <h2>回答を良くするテクニック集</h2>
+    <p>このページはパスワードで保護されています</p>
+    <input type="password" id="pw-input" placeholder="パスワードを入力" autofocus>
+    <br>
+    <button id="pw-btn" onclick="checkPassword()">解除</button>
+    <div id="pw-error">パスワードが違います</div>
+  </div>
+</div>
+
+<!-- ===== Protected Content ===== -->
+<div id="protected-content">
+<div class="layout">
+
+<nav class="sidebar" id="sideNav">
+  <div class="nav-title">回答を良くするテクニック集</div>
+  <a href="#sec1">1. パワハラプロンプト</a>
+  <a href="#sec2">2. 役割チェンジ</a>
+  <a href="#sec3">3. 逆張り</a>
+  <a href="#sec4">4. 5回聞き直し</a>
+  <a href="#sec5">5. 制約付き再生成</a>
+  <a href="#sec6">6. 審査員</a>
+  <a href="#sec7">7. ステップ公開</a>
+  <a href="#sec8">8. メタ指示</a>
+  <a href="#sec9">9. さらに磨く</a>
+  <a href="#sec9-1" class="sub">不確実性の明示</a>
+  <a href="#sec9-2" class="sub">自己矛盾チェック</a>
+  <a href="#sec9-3" class="sub">ブラインドスポット</a>
+  <a href="#sec9-4" class="sub">赤チーム・懐疑派</a>
+  <a href="#sec9-5" class="sub">ソクラテス式</a>
+  <a href="#sec9-6" class="sub">出力形式指定</a>
+  <a href="#sec10">10. 組み合わせ例</a>
+  <a href="#tips">使い方のコツ</a>
+</nav>
+
+<main>
+
+<h1>回答を良くするテクニック集</h1>
+<div class="subtitle">JRC 2026 ハンズオンセミナー 追加資料 — Local LLM Chat v1.8.0</div>
+<p class="intro">AIの回答をより良くするための追加プロンプトです。<br>
+まず普通に質問し、返ってきた回答に対してこれらのプロンプトを続けて送ると効果的です。<br>
+各プロンプトの右上にある「コピー」ボタンでクリップボードにコピーできます。</p>
+
+<!-- ==================== 1. パワハラ ==================== -->
+<h2 id="sec1">1. パワハラプロンプト</h2>
+<p>AIに「その答えは60点だよ、100点にしてよ！」と伝え、より良い答えを引き出すテクニックです。</p>
+
+<h3>ステップ1 — 評価</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>先ほどの回答は60点です。</pre></div>
+
+<h3>ステップ2 — 改善点</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>100点満点になるように、不足部分と改善案を出してください。</pre></div>
+
+<h3>ステップ3 — 再回答</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>それを踏まえて100点満点の回答をもう一度お願いします。</pre></div>
+
+<h3>一括で送る場合</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>先ほどの回答は60点です。100点満点になるように、不足している情報や改善すべき点を挙げてください。その上で、100点満点の回答をもう一度お願いします。</pre></div>
+
+<h3>一発パワハラ（最初の質問に組み込む）</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>上記の質問に答えてください。回答の最後に、その回答を自分で60点と仮採点し、「100点にするために足りない点・改善案」を3つ挙げたうえで、その改善を反映した「100点版の回答」をあらためて書いてください。</pre></div>
+
+<hr>
+
+<!-- ==================== 2. 役割チェンジ ==================== -->
+<h2 id="sec2">2. 役割チェンジ（ペルソナ切り替え）</h2>
+<p>別の視点で言い直させることで、抜けや偏りに気づきやすくします。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答を、その分野の専門家が同僚に説明するときの口調で言い直してください。</pre></div>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答の反対の立場に立って、批判的な視点で要約してください。</pre></div>
+
+<hr>
+
+<!-- ==================== 3. 逆張り ==================== -->
+<h2 id="sec3">3. 逆張りプロンプト</h2>
+<p>反論を出させてから結論をまとめさせ、バランスの取れた回答を引き出します。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>その回答の反対の立場で、説得力のある反論を書いてください。その後、どちらが正しいか判断してまとめてください。</pre></div>
+
+<hr>
+
+<!-- ==================== 4. 5回聞き直し ==================== -->
+<h2 id="sec4">4. 5回聞き直し（Why の掘り下げ）</h2>
+<p>結論の理由を「なぜ？」で掘り下げさせ、根拠の薄い部分を表面化させます。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>その結論の理由を、「なぜ？」を5回繰り返して掘り下げてください。</pre></div>
+
+<hr>
+
+<!-- ==================== 5. 制約付き再生成 ==================== -->
+<h2 id="sec5">5. 制約付き再生成</h2>
+<p>文字数や表現の制約をかけて言い換えさせ、要約力や説明の質を試します。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答を、3文以内で言い換えてください。</pre></div>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答を、専門用語を一切使わず、同じ内容を説明してください。</pre></div>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答の要点を、箇条書きで5つにまとめてください。</pre></div>
+
+<hr>
+
+<!-- ==================== 6. 審査員 ==================== -->
+<h2 id="sec6">6. 審査員プロンプト</h2>
+<p>AIに採点者役をさせ、減点理由と満点にするための修正案を出させます。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>あなたは採点者です。先ほどのあなた自身の回答を100点満点で採点し、減点理由と満点にするための具体的な修正案を出してください。</pre></div>
+
+<hr>
+
+<!-- ==================== 7. ステップ公開 ==================== -->
+<h2 id="sec7">7. ステップ公開プロンプト</h2>
+<p>考えのステップを1つずつ書かせてから最終答えを出させ、論理の飛躍を減らします。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>この問題を解くとき、考えのステップを1つずつ書いてから、最終答えを出してください。</pre></div>
+
+<hr>
+
+<!-- ==================== 8. メタ指示 ==================== -->
+<h2 id="sec8">8. メタ指示</h2>
+<p>質問の意図を要約させてから答えることで、的はずれな回答を防ぎます。</p>
+
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>この質問に答える前に、この質問で本当に聞きたいことを一文で要約し、それに答える形で回答してください。</pre></div>
+
+<hr>
+
+<!-- ==================== 9. さらに磨く ==================== -->
+<h2 id="sec9">9. さらに磨くテクニック（100点を狙う）</h2>
+<p>「60点の回答」をさらに引き上げるための、やや高度なテクニックです。</p>
+
+<h3 id="sec9-1">9-1. 不確実性の明示</h3>
+<p>確信度の高い部分と推測の部分を分けさせ、幻覚や過信を減らします。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答について、確信度の高い部分と、推測や要確認の部分を分けて整理し直してください。推測部分には「要確認」と明記してください。</pre></div>
+
+<h3 id="sec9-2">9-2. 自己矛盾チェック</h3>
+<p>回答内の矛盾を自分で指摘・修正させ、論理の一貫性を高めます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>今の回答のなかで、矛盾している可能性のある箇所を自分で指摘してください。あれば修正案を出し、矛盾がなければ「矛盾なし」とだけ答えてください。</pre></div>
+
+<h3 id="sec9-3">9-3. ブラインドスポット確認（見落としの洗い出し）</h3>
+<p>触れていない重要論点・リスク・例外を挙げさせ、抜けを減らします。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>この回答で触れていないが、重要な論点・リスク・例外はありますか？ あれば箇条書きで列挙し、それぞれ1行で補足してください。なければ「特になし」と答えてください。</pre></div>
+
+<h3 id="sec9-4">9-4. 赤チーム・懐疑派チェック</h3>
+<p>懐疑的な読者が突っ込むであろう点を挙げさせ、反論も書かせます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>この回答を読んだ懐疑的な専門家が、最初に突っ込むであろう点を3つ挙げてください。それぞれについて、あなたの反論も1〜2文で書いてください。</pre></div>
+
+<h3 id="sec9-5">9-5. ソクラテス式（問いで導く）</h3>
+<p>結論を最初に言わず、質問に答える形で段階を踏んで結論に導かせます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>結論を最初に言わず、質問に答える形で段階を踏んで結論に導いてください。各ステップで「では〜でしょうか？」のような問いを挟み、読者が一緒に考えているように進めてください。</pre></div>
+
+<h3 id="sec9-6">9-6. 出力形式の厳密指定</h3>
+<p>「要約・根拠・注意点」など、ブロックを指定して答えさせます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下の3ブロックだけを使って回答してください。それ以外は書かないでください。
+1) 要約（1文）
+2) 根拠（箇条書きで3つまで）
+3) 注意点・例外（1つ）</pre></div>
+
+<hr>
+
+<!-- ==================== 10. 組み合わせ ==================== -->
+<h2 id="sec10">10. テクニックの組み合わせ例</h2>
+
+<h3>パワハラ → 逆張り</h3>
+<p>パワハラで「60点→100点」の改善を一度させた後に：</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>その回答の反対の立場で反論を書いてください。その後、どちらが正しいか判断してまとめてください。</pre></div>
+
+<h3>パワハラ → 制約付き</h3>
+<p>パワハラで改善案を出させた後に：</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>その改善案を踏まえた100点の回答を、3文で要約してください。</pre></div>
+
+<h3>パワハラ → 審査員</h3>
+<p>パワハラで「不足部分と改善案」を出させた後に：</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>あなたは採点者です。今出した改善案を100点満点で採点し、さらに満点にするための修正案を出してください。</pre></div>
+
+<hr>
+
+<!-- ==================== Tips ==================== -->
+<h2 id="tips">使い方のコツ</h2>
+<div class="tips">
+<ul>
+  <li><strong>まず普通に質問</strong>して、返ってきた回答に対してこれらのプロンプトを続けて送ると効果的です。</li>
+  <li><strong>パワハラ</strong>は「評価→改善→再生成」の3ステップを意識すると、より質の高い再回答が得られます。</li>
+  <li><strong>組み合わせ</strong>では、パワハラで一度改善させたあとに、役割チェンジ・制約付き・逆張りなどを重ねると、さらに磨きがかかります。</li>
+  <li><strong>9章のプロンプト</strong>は、不確実性の明示・矛盾チェック・ブラインドスポット・懐疑派チェックなどで「幻覚や見落とし」を減らし、100点に近づける補助として使えます。</li>
+</ul>
+</div>
+
+<footer>Local LLM Chat v1.8.0 — JRC2026 Edition</footer>
+
+</main>
+</div>
+</div>
+
+<script>
+// --- password check ---
+var STORAGE_KEY = "advanced_prompts_unlocked";
+function unlockContent() {
+  document.getElementById("pw-gate").style.display = "none";
+  document.getElementById("protected-content").style.display = "block";
+}
+function checkPassword() {
+  var input = document.getElementById("pw-input").value;
+  if (input === "jrc2026llm") {
+    try { localStorage.setItem(STORAGE_KEY, "true"); } catch(e) {}
+    unlockContent();
+  } else {
+    var err = document.getElementById("pw-error");
+    err.style.display = "block";
+    document.getElementById("pw-input").value = "";
+    document.getElementById("pw-input").focus();
+    setTimeout(function(){ err.style.display = "none"; }, 2000);
+  }
+}
+document.addEventListener("DOMContentLoaded", function(){
+  // 一度解除済みならパスワード不要
+  try {
+    if (localStorage.getItem(STORAGE_KEY) === "true") {
+      unlockContent();
+      return;
+    }
+  } catch(e) {}
+  document.getElementById("pw-input").addEventListener("keydown", function(e){
+    if (e.key === "Enter") checkPassword();
+  });
+});
+
+// --- copy ---
+function copyPrompt(btn) {
+  var pre = btn.parentElement.querySelector("pre");
+  var text = pre.textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    btn.textContent = "コピー完了";
+    btn.classList.add("copied");
+    setTimeout(function() {
+      btn.textContent = "コピー";
+      btn.classList.remove("copied");
+    }, 1500);
+  }).catch(function() {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      btn.textContent = "コピー完了";
+      btn.classList.add("copied");
+      setTimeout(function() {
+        btn.textContent = "コピー";
+        btn.classList.remove("copied");
+      }, 1500);
+    } catch(e) {
+      btn.textContent = "失敗";
+      setTimeout(function() { btn.textContent = "コピー"; }, 1500);
+    }
+    document.body.removeChild(ta);
+  });
+}
+
+// --- sidebar active highlight ---
+var sections = document.querySelectorAll("h2[id], h3[id]");
+var navLinks = document.querySelectorAll("nav.sidebar a");
+window.addEventListener("scroll", function() {
+  var current = "";
+  for (var i = 0; i < sections.length; i++) {
+    if (sections[i].getBoundingClientRect().top <= 120) current = sections[i].id;
+  }
+  navLinks.forEach(function(a) {
+    a.classList.toggle("active", a.getAttribute("href") === "#" + current);
+  });
+}, { passive: true });
+</script>
+</body>
+</html>
