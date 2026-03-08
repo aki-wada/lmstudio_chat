@@ -141,6 +141,20 @@
     if (migrated) {
       console.log("[Migration] データ移行が完了しました");
     }
+
+    // 旧 persistApiKey / volatileApiKey を削除（機能廃止: API鍵は常にlocalStorageに保存）
+    const settingsRaw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (settingsRaw) {
+      const parsed = safeJSONParse(settingsRaw, {});
+      if ("persistApiKey" in parsed || "volatileApiKey" in parsed) {
+        delete parsed.persistApiKey;
+        delete parsed.volatileApiKey;
+        delete parsed._volatileMigrated;
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
+        sessionStorage.removeItem("localLLMChat_apiKey");
+        console.log("[Migration] persistApiKey/volatileApiKey を削除しました");
+      }
+    }
   }
 
   const LIMITS = Object.freeze({
@@ -489,8 +503,7 @@
     showWelcome: true,    // v1.8.0: 起動時にオープニング画面を表示
     showSamplePrompts: true, // プロンプト集ボタンの表示
     hideThinking: false,     // 思考プロセス表示を非表示
-    disableThinking: false,  // Thinkingモード無効化（Qwen等）
-    persistApiKey: false,    // API鍵をlocalStorageに保存するか（falseならsessionStorageのみ）
+    enableQwen3Thinking: false, // Qwen3のThinkingモードを有効化（デフォルト: 無効）
   });
 
   // ---------------------------------------------------------------------------
@@ -509,8 +522,9 @@
     settingsBtn: document.getElementById("settingsBtn"),
     settingsPanel: document.getElementById("settingsPanel"),
     closeSettingsBtn: document.getElementById("closeSettingsBtn"),
+    baseUrlPreset: document.getElementById("baseUrlPreset"),
     baseUrl: document.getElementById("baseUrl"),
-    apiKey: document.getElementById("apiKey"),
+    apiKey: document.getElementById("apiKey"),  // UI削除済み: null
     temperature: document.getElementById("temperature"),
     tempValue: document.getElementById("tempValue"),
     maxTokens: document.getElementById("maxTokens"),
@@ -527,12 +541,11 @@
     userInterests: document.getElementById("userInterests"),
     darkModeToggle: document.getElementById("darkModeToggle"),
     autoUnloadToggle: document.getElementById("autoUnloadToggle"),      // v1.7.3
-    reasoningEffort: document.getElementById("reasoningEffort"),        // v1.8.0
+    reasoningEffort: document.getElementById("reasoningEffort"),        // v1.8.0: UI削除済み（null）
     showWelcomeToggle: document.getElementById("showWelcomeToggle"),   // v1.8.0
     showSamplePromptsToggle: document.getElementById("showSamplePromptsToggle"),
     hideThinkingToggle: document.getElementById("hideThinkingToggle"),
-    disableThinkingToggle: document.getElementById("disableThinkingToggle"),
-    persistApiKeyToggle: document.getElementById("persistApiKeyToggle"),
+    enableQwen3ThinkingToggle: document.getElementById("enableQwen3ThinkingToggle"),
     samplePromptsBtn: document.getElementById("samplePromptsBtn"),
 
     // v1.7.2: 医学用語チェックモーダル
@@ -605,7 +618,8 @@
     controller: null,          // Stopボタン用
     availableModels: new Set(), // /v1/models の正確なID一覧
     modelDetails: new Map(),   // v1.7.0: モデル詳細情報（state, quantization, max_context_length）
-    lmstudioV1Available: false // v1.7.0: LM Studio v1 API 利用可能フラグ
+    lmstudioV1Available: false, // v1.7.0: LM Studio v1 API 利用可能フラグ
+    lastUsage: null,           // 最新の応答のusage情報
   };
 
   /**
@@ -658,10 +672,15 @@
   let currentSessionId = "";
 
   // ---------------------------------------------------------------------------
-  // Help Mode: マニュアル内容の遅延ロード
+  // Help Mode: 3段階ヘルプシステム (v1.8.1)
+  //   1. FAQ表示 — よくある質問をカードで表示、クリックで即回答
+  //   2. ローカル検索 — マニュアル内をキーワード検索
+  //   3. LLM質問 — 検索で不足ならLLMに質問を転送
   // ---------------------------------------------------------------------------
 
   let _manualContentCache = null;
+  /** @type {Array<{title:string, content:string}>} マニュアルをセクション分割したキャッシュ */
+  let _manualSections = [];
 
   const HELP_MANUAL_FALLBACK = `# Local LLM Chat ヘルプ
 このアプリはローカルLLMサーバー（LM Studio / Ollama）と連携するチャットアプリです。
@@ -669,6 +688,50 @@
 - 画像・ファイル添付対応（Vision対応モデルで画像認識可能）
 - ⚖️ 比較モードで2つのモデルの回答を並べて比較
 - 詳しくは MANUAL.md を参照してください。`;
+
+  /** よくある質問（即座に回答可能な項目） */
+  const HELP_FAQ = [
+    {
+      icon: "🚀",
+      q: "起動方法は？",
+      a: "1. LM StudioまたはOllamaを起動し、モデルをロード\n2. index.html をブラウザで開く\n3. 設定 → 基本タブ → 接続先サーバーを選択（LM Studio / Ollama / カスタム）\n4. モデルが自動的にドロップダウンに表示されます\n\n疎通確認: ターミナルで以下を実行\n・LM Studio: curl http://localhost:1234/v1/models\n・Ollama: curl http://localhost:11434/v1/models"
+    },
+    {
+      icon: "🤖",
+      q: "モデルが表示されない",
+      a: "1. LM Studio/Ollamaでモデルがロードされているか確認（最重要）\n2. 設定 → 基本タブ → 接続先サーバーが正しいか確認\n3. ターミナルで疎通確認（LM Studio: curl http://localhost:1234/v1/models / Ollama: curl http://localhost:11434/v1/models）\n4. LM Studioの場合: CORSが有効か確認（設定 → Local Server → 「CORSを有効にする」がON）\n5. モデル選択ドロップダウンをクリックして更新\n6. 設定 → モデルタブ → 「表示モデル管理」で非表示になっていないか確認"
+    },
+    {
+      icon: "📎",
+      q: "ファイル添付の使い方",
+      a: "📷 Image: 画像ファイルを添付（複数可、20MB以下）\n📎 File: テキスト/PDFファイルを添付（テキスト2MB、PDF10MB以下）\n\n対応方法: ボタン、Ctrl+V（ペースト）、ドラッグ＆ドロップ\nVision対応モデル（👁️マーク）で画像認識が可能です。PDFはテキスト抽出してLLMに送信されます。"
+    },
+    {
+      icon: "⚖️",
+      q: "モデル比較の使い方",
+      a: "1. ⚖️ 比較ボタンをONにする\n2. 2つ目のモデルを選択（LM Studioで2つのモデルをロードしておく必要あり）\n3. メッセージを送信すると、両モデルの回答が並んで表示されます\n\n注意: LM Studio v0.4.0以降が必要です。Developers設定の「JIT models auto-evict」をOFFにしてください。"
+    },
+    {
+      icon: "⌨️",
+      q: "キーボードショートカット",
+      a: "Enter / Ctrl+Enter: メッセージ送信（設定で変更可能）\nShift+Enter: 改行\nCtrl+V: 画像ペースト\nCtrl+K: 履歴クリア\nCtrl+/: ショートカット一覧を表示\nEsc: パネルを閉じる"
+    },
+    {
+      icon: "💾",
+      q: "データの保存場所は？",
+      a: "会話履歴と設定はブラウザのlocalStorageに保存されます。外部サーバーには一切送信されません。\n\n画像データが多い場合はIndexedDBに自動オフロードされます。\n\n「設定 → データタブ → すべての保存データを消す」で全データを初期化できます。"
+    },
+    {
+      icon: "🔧",
+      q: "応答が途中で止まる",
+      a: "1. Max Tokensの値を確認（小さすぎると途中で切れます）\n2. より小さいモデルを試す\n3. 長い会話は「新しい話題」ボタンでコンテキストをリセット\n4. Temperature を下げると安定しやすくなります"
+    },
+    {
+      icon: "🧠",
+      q: "Thinkingモードとは？",
+      a: "Qwen3等のモデルが<think>タグで思考プロセスを出力する機能です。\n\nQwen3はデフォルトでThinking無効です。設定 → モデルタブ → 🧠 Thinking設定 で制御できます:\n・「Qwen3のThinkingを有効化」: チェックでThinkingを有効化\n・「思考プロセスを非表示」: 表示だけ隠す（折りたたみ）"
+    },
+  ];
 
   async function getManualContent() {
     if (_manualContentCache) return _manualContentCache;
@@ -680,7 +743,253 @@
       console.warn("[Help] マニュアル外部ファイル読込失敗、フォールバック使用:", e.message);
       _manualContentCache = HELP_MANUAL_FALLBACK;
     }
+    _manualSections = parseManualSections(_manualContentCache);
     return _manualContentCache;
+  }
+
+  /**
+   * マニュアルテキストを ##/### 見出し単位でセクション分割
+   * @param {string} text
+   * @returns {Array<{title:string, content:string}>}
+   */
+  function parseManualSections(text) {
+    const lines = text.split("\n");
+    const sections = [];
+    let currentTitle = "";
+    let currentLines = [];
+
+    for (const line of lines) {
+      const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
+      if (headingMatch) {
+        if (currentTitle || currentLines.length > 0) {
+          sections.push({ title: currentTitle, content: currentLines.join("\n").trim() });
+        }
+        currentTitle = headingMatch[2];
+        currentLines = [];
+      } else {
+        currentLines.push(line);
+      }
+    }
+    if (currentTitle || currentLines.length > 0) {
+      sections.push({ title: currentTitle, content: currentLines.join("\n").trim() });
+    }
+    return sections.filter(s => s.content.length > 0);
+  }
+
+  /**
+   * マニュアル内をキーワード検索し、該当セクションを返す
+   * @param {string} query
+   * @returns {Array<{title:string, content:string, score:number}>}
+   */
+  function searchManualSections(query) {
+    if (_manualSections.length === 0 && _manualContentCache) {
+      _manualSections = parseManualSections(_manualContentCache);
+    }
+    if (_manualSections.length === 0) return [];
+
+    const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 0);
+    if (keywords.length === 0) return [];
+
+    const results = [];
+    for (const section of _manualSections) {
+      const haystack = (section.title + " " + section.content).toLowerCase();
+      let score = 0;
+      for (const kw of keywords) {
+        // タイトルマッチは高スコア
+        if (section.title.toLowerCase().includes(kw)) score += 3;
+        // 本文マッチ（出現回数）
+        const contentMatches = haystack.split(kw).length - 1;
+        score += contentMatches;
+      }
+      if (score > 0) {
+        results.push({ ...section, score });
+      }
+    }
+    return results.sort((a, b) => b.score - a.score).slice(0, 5);
+  }
+
+  /**
+   * 検索結果のテキスト内でキーワードをハイライト（HTML）
+   * @param {string} text
+   * @param {string} query
+   * @returns {string}
+   */
+  function highlightKeywords(text, query) {
+    const keywords = query.split(/\s+/).filter(k => k.length > 0);
+    let html = escapeHtml(text);
+    for (const kw of keywords) {
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      html = html.replace(new RegExp(`(${escaped})`, "gi"), "<mark>$1</mark>");
+    }
+    return html;
+  }
+
+  /**
+   * ヘルプパネル（FAQ + 検索ボックス）をチャットエリアに表示
+   */
+  function showHelpPanel() {
+    hideHelpPanel();
+    hideWelcomeScreen();
+
+    const panel = document.createElement("div");
+    panel.className = "help-panel";
+    panel.id = "helpPanelInChat";
+
+    // タイトル
+    panel.innerHTML = `
+      <div style="font-size:2rem;margin-bottom:4px">❓</div>
+      <h2 class="help-panel-title">ヘルプ</h2>
+      <p class="help-panel-subtitle">よくある質問をクリック、または下の検索ボックスで探せます</p>
+    `;
+
+    // FAQ グリッド
+    const grid = document.createElement("div");
+    grid.className = "help-faq-grid";
+    for (let i = 0; i < HELP_FAQ.length; i++) {
+      const faq = HELP_FAQ[i];
+      const card = document.createElement("div");
+      card.className = "help-faq-card";
+      card.innerHTML = `
+        <span class="help-faq-icon">${faq.icon}</span>
+        <span class="help-faq-text"><strong>${escapeHtml(faq.q)}</strong></span>
+      `;
+      card.addEventListener("click", () => showFaqAnswer(i));
+      grid.appendChild(card);
+    }
+    panel.appendChild(grid);
+
+    // FAQ 回答表示エリア
+    const answerArea = document.createElement("div");
+    answerArea.id = "helpFaqAnswerArea";
+    answerArea.style.cssText = "max-width:560px;width:100%";
+    panel.appendChild(answerArea);
+
+    // 検索ボックス
+    const searchBox = document.createElement("div");
+    searchBox.className = "help-search-box";
+    searchBox.innerHTML = `
+      <input type="text" class="help-search-input" id="helpSearchInput"
+             placeholder="キーワードで検索…（例: CORS、比較、PDF）" />
+      <button class="help-search-btn" id="helpSearchBtn">🔍 検索</button>
+    `;
+    panel.appendChild(searchBox);
+
+    // 検索結果エリア
+    const resultsArea = document.createElement("div");
+    resultsArea.className = "help-search-results";
+    resultsArea.id = "helpSearchResults";
+    panel.appendChild(resultsArea);
+
+    // LLMに質問ボタン
+    const llmRow = document.createElement("div");
+    llmRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:8px";
+    llmRow.innerHTML = `
+      <button class="help-llm-btn" id="helpAskLlmBtn">🤖 LLMに質問する</button>
+      <span style="font-size:0.8rem;color:#999">検索で見つからない場合</span>
+    `;
+    panel.appendChild(llmRow);
+
+    // 閉じるボタン
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "help-close-btn";
+    closeBtn.textContent = "← ヘルプを閉じる";
+    closeBtn.addEventListener("click", () => {
+      helpMode = false;
+      updateHelpButton();
+      hideHelpPanel();
+      if (messages.length === 0) showWelcomeScreen();
+      notify("❓ ヘルプモード OFF");
+    });
+    panel.appendChild(closeBtn);
+
+    el.chat.appendChild(panel);
+
+    // イベント登録
+    const searchInput = document.getElementById("helpSearchInput");
+    const searchBtn = document.getElementById("helpSearchBtn");
+    const askLlmBtn = document.getElementById("helpAskLlmBtn");
+
+    searchBtn.addEventListener("click", () => executeHelpSearch(searchInput.value));
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        executeHelpSearch(searchInput.value);
+      }
+    });
+
+    askLlmBtn.addEventListener("click", () => {
+      const query = searchInput.value.trim();
+      if (!query) {
+        searchInput.focus();
+        searchInput.placeholder = "質問を入力してからボタンを押してください";
+        return;
+      }
+      // ヘルプパネルを消してLLMモードでチャットに質問を送信
+      hideHelpPanel();
+      el.prompt.value = query;
+      // helpMode は ON のまま → buildConversation でマニュアル注入
+      handleSend();
+    });
+
+    scrollToBottom();
+  }
+
+  /**
+   * FAQの回答をパネル内に表示
+   * @param {number} index
+   */
+  function showFaqAnswer(index) {
+    const faq = HELP_FAQ[index];
+    if (!faq) return;
+    const area = document.getElementById("helpFaqAnswerArea");
+    if (!area) return;
+
+    area.innerHTML = `
+      <div class="help-faq-answer">
+        <div class="help-faq-answer-title">${faq.icon} ${escapeHtml(faq.q)}</div>
+        <div style="white-space:pre-wrap">${escapeHtml(faq.a)}</div>
+      </div>
+    `;
+    area.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /**
+   * ローカル検索を実行して結果を表示
+   * @param {string} query
+   */
+  function executeHelpSearch(query) {
+    const trimmed = query.trim();
+    const resultsEl = document.getElementById("helpSearchResults");
+    if (!resultsEl) return;
+
+    if (!trimmed) {
+      resultsEl.innerHTML = "";
+      return;
+    }
+
+    const results = searchManualSections(trimmed);
+
+    if (results.length === 0) {
+      resultsEl.innerHTML = `
+        <div class="help-search-no-result">
+          「${escapeHtml(trimmed)}」に該当する項目が見つかりませんでした。<br>
+          「🤖 LLMに質問する」ボタンで詳しく聞くことができます。
+        </div>
+      `;
+    } else {
+      resultsEl.innerHTML = results.map(r => `
+        <div class="help-search-result">
+          <div class="help-search-result-title">${escapeHtml(r.title)}</div>
+          <div style="white-space:pre-wrap">${highlightKeywords(r.content, trimmed)}</div>
+        </div>
+      `).join("");
+    }
+    resultsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function hideHelpPanel() {
+    const panel = document.getElementById("helpPanelInChat");
+    if (panel) panel.remove();
   }
 
   // ---------------------------------------------------------------------------
@@ -778,6 +1087,63 @@
     return VISION_KEYWORDS.some(k => lower.includes(k));
   }
 
+  /**
+   * Qwen3 Thinkingモデルかどうかを判定（qwen3.5、qwen3-vl は除外）
+   * @param {string} modelId
+   * @returns {boolean}
+   */
+  function isQwen3ThinkingModel(modelId) {
+    const lower = String(modelId).toLowerCase();
+    // "qwen3" を含むが "qwen3.5" "qwen3-vl" "qwen3_vl" を除外
+    if (!lower.includes("qwen3")) return false;
+    if (lower.includes("qwen3.5")) return false;
+    if (lower.includes("qwen3-vl") || lower.includes("qwen3_vl")) return false;
+    return true;
+  }
+
+  /**
+   * 現在のモデルでThinkingを無効化すべきかを判定
+   * Qwen3のみ: デフォルト無効、トグルONで有効化
+   * @returns {boolean}
+   */
+  function shouldDisableThinking() {
+    const model = el.modelSelect.value || settings.model || "";
+    if (isQwen3ThinkingModel(model)) {
+      return !settings.enableQwen3Thinking;
+    }
+    return false;
+  }
+
+  /**
+   * 応答統計（時間・トークン数・速度）をメッセージ下部に表示
+   * @param {HTMLElement} msgDiv - assistantメッセージのdiv
+   * @param {number} elapsedMs - 応答時間（ミリ秒）
+   * @param {object|null} usage - APIのusageオブジェクト
+   */
+  function appendResponseStats(msgDiv, elapsedMs, usage) {
+    // 既存のstatsがあれば削除
+    const existing = msgDiv.querySelector(".response-stats");
+    if (existing) existing.remove();
+
+    const parts = [];
+    const sec = (elapsedMs / 1000).toFixed(1);
+
+    if (usage && usage.completion_tokens) {
+      const tps = (usage.completion_tokens / (elapsedMs / 1000)).toFixed(1);
+      parts.push(`⚡ ${tps} tok/s`);
+      if (usage.prompt_tokens) {
+        parts.push(`📥 prompt: ${usage.prompt_tokens}`);
+      }
+      parts.push(`📝 ${usage.completion_tokens} tokens`);
+    }
+    parts.push(`⏱ ${sec}s`);
+
+    const statsEl = document.createElement("div");
+    statsEl.className = "response-stats";
+    statsEl.textContent = parts.join("  ·  ");
+    msgDiv.appendChild(statsEl);
+  }
+
   /** @param {string} message */
   function notify(message) {
     appendMessage("system", message, { save: false });
@@ -837,11 +1203,7 @@
   function loadSettings() {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS) || "{}";
     const s = safeJSONParse(raw, {});
-    const persistApiKey = Boolean(s.persistApiKey);
-    // API鍵: persistApiKey=true → localStorageから読む / false → sessionStorageから読む
-    const apiKey = persistApiKey
-      ? (s.apiKey || DEFAULT_SETTINGS.apiKey)
-      : (sessionStorage.getItem("localLLMChat_apiKey") || s.apiKey || DEFAULT_SETTINGS.apiKey);
+    const apiKey = s.apiKey || DEFAULT_SETTINGS.apiKey;
     return /** @type {Settings} */ ({
       baseUrl: s.baseUrl || DEFAULT_SETTINGS.baseUrl,
       apiKey,
@@ -862,15 +1224,23 @@
       showWelcome: s.showWelcome !== false,        // v1.8.0: デフォルトtrue
       showSamplePrompts: s.showSamplePrompts !== false, // デフォルトtrue
       hideThinking: Boolean(s.hideThinking),
-      disableThinking: Boolean(s.disableThinking),
-      persistApiKey: Boolean(s.persistApiKey),
+      enableQwen3Thinking: Boolean(s.enableQwen3Thinking),
     });
   }
 
   /** Settings → UIへ反映 */
   function applySettingsToUI() {
+    // Base URL プリセット連動
+    const presetUrls = Array.from(el.baseUrlPreset.options).map(o => o.value).filter(v => v !== "custom");
+    if (presetUrls.includes(settings.baseUrl)) {
+      el.baseUrlPreset.value = settings.baseUrl;
+      el.baseUrl.style.display = "none";
+    } else {
+      el.baseUrlPreset.value = "custom";
+      el.baseUrl.style.display = "";
+    }
     el.baseUrl.value = settings.baseUrl;
-    el.apiKey.value = settings.apiKey;
+    if (el.apiKey) el.apiKey.value = settings.apiKey;
     el.temperature.value = String(settings.temperature);
     el.tempValue.textContent = String(settings.temperature);
     el.maxTokens.value = String(settings.maxTokens);
@@ -919,21 +1289,16 @@
     if (el.hideThinkingToggle) {
       el.hideThinkingToggle.checked = Boolean(settings.hideThinking);
     }
-    if (el.disableThinkingToggle) {
-      el.disableThinkingToggle.checked = Boolean(settings.disableThinking);
-    }
-    if (el.persistApiKeyToggle) {
-      el.persistApiKeyToggle.checked = Boolean(settings.persistApiKey);
+    if (el.enableQwen3ThinkingToggle) {
+      el.enableQwen3ThinkingToggle.checked = Boolean(settings.enableQwen3Thinking);
     }
   }
 
   /** UI → settingsへ反映し保存 */
   function saveSettingsFromUI() {
-    const persistApiKey = el.persistApiKeyToggle?.checked || false;
-    const apiKeyValue = el.apiKey.value.trim();
     settings = {
-      baseUrl: el.baseUrl.value.trim(),
-      apiKey: apiKeyValue,
+      baseUrl: el.baseUrlPreset.value === "custom" ? el.baseUrl.value.trim() : el.baseUrlPreset.value,
+      apiKey: el.apiKey?.value?.trim() || settings.apiKey || DEFAULT_SETTINGS.apiKey,
       model: el.modelSelect.value,
       temperature: parseFloat(el.temperature.value),
       maxTokens: parseInt(el.maxTokens.value, 10),
@@ -951,20 +1316,9 @@
       showWelcome: el.showWelcomeToggle?.checked !== false,    // v1.8.0
       showSamplePrompts: el.showSamplePromptsToggle?.checked !== false,
       hideThinking: el.hideThinkingToggle?.checked || false,
-      disableThinking: el.disableThinkingToggle?.checked || false,
-      persistApiKey,
+      enableQwen3Thinking: el.enableQwen3ThinkingToggle?.checked || false,
     };
-    // API鍵の保存先を分岐
-    const toSave = { ...settings };
-    if (persistApiKey) {
-      // localStorageに保存、sessionStorageはクリア
-      sessionStorage.removeItem("localLLMChat_apiKey");
-    } else {
-      // sessionStorageに保存、localStorageからは除外
-      sessionStorage.setItem("localLLMChat_apiKey", apiKeyValue);
-      delete toSave.apiKey;
-    }
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(toSave));
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }
 
   /** @returns {StoredMessage[]} */
@@ -1098,8 +1452,6 @@
 
     // すべてのlocalStorageキーを削除
     Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
-    // sessionStorage（API鍵等）も削除
-    sessionStorage.removeItem("localLLMChat_apiKey");
     // IndexedDB画像も削除
     clearAllImagesFromIdb().catch(e => console.warn("[IDB] 画像削除失敗:", e));
 
@@ -1720,7 +2072,7 @@
    * @param {{save?:boolean, imageData?:string|null}=} opts
    */
   function appendMessage(role, content, opts = {}) {
-    if (role !== "system") hideWelcomeScreen();
+    if (role !== "system") { hideWelcomeScreen(); hideHelpPanel(); }
     const { save = true, imageData = null, imageDataList = null, msgId = null } = opts;
 
     const id = msgId || generateMsgId();
@@ -2219,7 +2571,7 @@ ${manual}
    */
   async function checkLmstudioV1Api() {
     const apiBase = getApiBaseUrl();
-    const key = settings.apiKey || el.apiKey.value.trim();
+    const key = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
 
     try {
       const res = await fetch(`${apiBase}${LMSTUDIO_V1_API.MODELS}`, {
@@ -2237,7 +2589,7 @@ ${manual}
    */
   async function fetchAllModelsV1() {
     const apiBase = getApiBaseUrl();
-    const authKey = settings.apiKey || el.apiKey.value.trim();
+    const authKey = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
 
     const res = await fetch(`${apiBase}${LMSTUDIO_V1_API.MODELS}`, {
       headers: { Authorization: `Bearer ${authKey}` },
@@ -2270,7 +2622,7 @@ ${manual}
    */
   async function loadModelV1(modelId) {
     const apiBase = getApiBaseUrl();
-    const key = settings.apiKey || el.apiKey.value.trim();
+    const key = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
 
     try {
       const res = await fetch(`${apiBase}${LMSTUDIO_V1_API.LOAD}`, {
@@ -2300,7 +2652,7 @@ ${manual}
    */
   async function unloadModelV1(modelId) {
     const apiBase = getApiBaseUrl();
-    const key = settings.apiKey || el.apiKey.value.trim();
+    const key = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
 
     try {
       const res = await fetch(`${apiBase}${LMSTUDIO_V1_API.UNLOAD}`, {
@@ -2340,7 +2692,7 @@ ${manual}
     runtime.modelDetails.clear();
 
     const base = trimTrailingSlashes(settings.baseUrl || el.baseUrl.value.trim());
-    const key = settings.apiKey || el.apiKey.value.trim();
+    const key = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
 
     // UI: Loading...
     el.modelSelect.innerHTML = "<option>Loading...</option>";
@@ -2447,7 +2799,7 @@ ${manual}
     } catch (e) {
       el.modelSelect.innerHTML = "";
       if (isLikelyServerOffline(e)) {
-        notify("⚠️ LM Studioが起動していないか、Base URLに接続できません。LM Studioを起動して再試行してください。");
+        notify("⚠️ サーバーに接続できません。LM Studio/Ollamaが起動しているか、接続先サーバーの設定を確認してください。");
       } else {
         notify("⚠️ モデル一覧を取得できませんでした。Base/KeyとServer状態を確認してください。");
       }
@@ -2564,6 +2916,11 @@ ${manual}
             j.choices?.[0]?.delta?.reasoning_content ??
             "";
 
+          // usage情報を取得（最終チャンクに含まれる）
+          if (j.usage) {
+            runtime.lastUsage = j.usage;
+          }
+
           if (delta || reasoningDelta) onDelta(delta, reasoningDelta);
         } catch {
           // 不完全JSONは次チャンクで完成（元実装踏襲）
@@ -2652,8 +3009,8 @@ ${manual}
     strongClearPrompt();
     clearAllAttachments();
 
-    // Thinkingモード無効化
-    if (settings.disableThinking) {
+    // Thinkingモード無効化（Qwen3はデフォルト無効、その他はトグルに従う）
+    if (shouldDisableThinking()) {
       text += " /no_think";
     }
 
@@ -2718,21 +3075,19 @@ ${manual}
     let contentB = "";
 
     const streamModel = async (model, msgEl, updateContent) => {
+      const modelStartTime = performance.now();
+      let modelUsage = null;
       const requestBody = {
         model,
         messages: apiMessages,
         stream: true,
+        stream_options: { include_usage: true },
         temperature: parseFloat(el.temperature.value) || 0.7,
         max_tokens: parseInt(el.maxTokens.value, 10) || 2048,
       };
 
-      // v1.8.0: reasoning_effort パラメータ
-      if (settings.reasoningEffort) {
-        requestBody.reasoning = { effort: settings.reasoningEffort };
-      }
-
-      // Thinkingモード無効化（Qwen等）
-      if (settings.disableThinking) {
+      // Thinkingモード無効化（Qwen3はデフォルト無効、その他はトグルに従う）
+      if (shouldDisableThinking()) {
         requestBody.chat_template_kwargs = { enable_thinking: false };
       }
 
@@ -2775,6 +3130,9 @@ ${manual}
               const { thinking, main } = extractThinkingBlocks(content || "(空応答)");
               contentEl.innerHTML = renderThinkingHtml(thinking, false) + safeMarkdown(main || "(空応答)");
             }
+            // 比較モード: 各モデルの応答統計を表示
+            modelUsage = runtime.lastUsage;
+            appendResponseStats(msgEl, performance.now() - modelStartTime, modelUsage);
           }
         );
 
@@ -2836,7 +3194,7 @@ ${manual}
     if (!hasAnyInput) return;
 
     const base = trimTrailingSlashes(settings.baseUrl || el.baseUrl.value.trim());
-    const key = settings.apiKey || el.apiKey.value.trim();
+    const key = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
     // モデルは常にUI（select要素）の値を優先して使用
     const model = el.modelSelect.value || settings.model;
 
@@ -2889,7 +3247,8 @@ ${manual}
     clearAllAttachments();
 
     // Thinkingモード無効化 — ユーザーメッセージ末尾に /no_think を付与
-    if (settings.disableThinking) {
+    // Qwen3はデフォルト無効、その他はトグルに従う
+    if (shouldDisableThinking()) {
       text += " /no_think";
     }
 
@@ -2921,6 +3280,9 @@ ${manual}
     isStreaming = true;                       // ★ ストリーミング開始
     userScrolledDuringStream = false;         // ★ スクロール状態リセット
 
+    const sendStartTime = performance.now();
+    runtime.lastUsage = null;
+
     try {
       const apiMessages = [...buildConversation(), userMessage];
 
@@ -2930,17 +3292,13 @@ ${manual}
           model,
           messages: apiMessages,
           stream: true,
+          stream_options: { include_usage: true },
           temperature: parseFloat(el.temperature.value) || 0.7,
           max_tokens: parseInt(el.maxTokens.value, 10) || 2048,
         };
 
-        // v1.8.0: reasoning_effort パラメータ
-        if (settings.reasoningEffort) {
-          requestBody.reasoning = { effort: settings.reasoningEffort };
-        }
-
-        // Thinkingモード無効化（Qwen等）
-        if (settings.disableThinking) {
+        // Thinkingモード無効化（Qwen3はデフォルト無効、その他はトグルに従う）
+        if (shouldDisableThinking()) {
           requestBody.chat_template_kwargs = { enable_thinking: false };
         }
 
@@ -2958,8 +3316,8 @@ ${manual}
           const t = await res.text().catch(() => "");
           const contentEl = currentMsgDiv.querySelector(".message-content");
           if (res.status === 401 || res.status === 403) {
-            if (contentEl) contentEl.textContent = "API鍵が正しくないか、認証に失敗しました。";
-            notify("🔑 API鍵を確認してください（設定 → モデル → API Key）");
+            if (contentEl) contentEl.textContent = "認証に失敗しました。サーバー側の認証設定を確認してください。";
+            notify("🔒 サーバーの認証設定を確認してください (HTTP " + res.status + ")");
           } else if (res.status >= 500) {
             if (contentEl) contentEl.textContent = "サーバーエラーが発生しました。LM Studioを再起動してください。";
             notify("⚠️ サーバーエラー (HTTP " + res.status + ")");
@@ -3024,6 +3382,10 @@ ${manual}
           messages.push({ id: assistantMsgId, role: "assistant", content });
           persistHistory();
         }
+
+        // 応答統計を表示
+        const elapsed = performance.now() - sendStartTime;
+        appendResponseStats(currentMsgDiv, elapsed, runtime.lastUsage);
       }
 
     } catch (e) {
@@ -3064,7 +3426,7 @@ ${manual}
       } else if (isLikelyServerOffline(e) && !currentContent) {
         // 生成が始まる前のエラーのみ「接続できませんでした」と表示
         if (contentEl) contentEl.textContent = "接続できませんでした。LM Studioが起動していない可能性があります。";
-        notify("⚠️ LM Studioが起動していないか、Base URLに接続できません。LM Studioを起動して再試行してください。");
+        notify("⚠️ サーバーに接続できません。LM Studio/Ollamaが起動しているか、接続先サーバーの設定を確認してください。");
       } else {
         // 生成途中でのエラーは内容を保持してエラーを追記
         const errorMsg = `\n\n⚠️ **エラーが発生しました**: ${e?.message || e}`;
@@ -3132,7 +3494,7 @@ AI応答テキスト:
    */
   async function checkMedicalTerminology(text) {
     const base = trimTrailingSlashes(settings.baseUrl || el.baseUrl.value.trim());
-    const key = settings.apiKey || el.apiKey.value.trim();
+    const key = settings.apiKey || el.apiKey?.value?.trim() || DEFAULT_SETTINGS.apiKey;
     const model = el.modelSelect.value || settings.model;
 
     if (!model || !text.trim()) return null;
@@ -3715,9 +4077,11 @@ AI応答テキスト:
 
   // デフォルトプリセット（変更不可）
   const DEFAULT_PRESETS = Object.freeze({
-    coding: `あなたはプログラミングに精通したAIアシスタントです。コードの説明・レビュー・デバッグ・改善提案を行います。回答にはコード例を含め、言語やフレームワークのベストプラクティスに従ってください。`,
     writing: `あなたは文章作成のプロフェッショナルです。ユーザーの意図に沿った自然で読みやすい日本語の文章を作成・校正・推敲します。ビジネス文書、レポート、メール、ブログなど幅広い文体に対応してください。`,
     translate: `あなたは翻訳の専門家です。日本語と英語の間で、文脈やニュアンスを正確に保ちながら翻訳してください。専門用語には原語を括弧書きで併記してください。`,
+    pdf: `以下の文章を箇条書きで要約してください。
+
+【文章】`,
     brainstorm: `あなたは創造的なブレインストーミングパートナーです。ユーザーのアイデアを広げ、多角的な視点から提案を行ってください。批判よりも発展・拡張を優先し、実現可能性も考慮してください。`,
     disease: `以下の疾患について、医学的に正確な解説をしてください。
 
@@ -3757,22 +4121,20 @@ AI応答テキスト:
 【相手】
 【用件】
 【トーン】`,
-    pdf: `以下の文章を箇条書きで要約してください。
-
-【文章】`,
+    coding: `あなたはプログラミングに精通したAIアシスタントです。コードの説明・レビュー・デバッグ・改善提案を行います。回答にはコード例を含め、言語やフレームワークのベストプラクティスに従ってください。`,
   });
 
   const DEFAULT_PRESET_LABELS = Object.freeze({
-    coding: "💻 プログラミング",
     writing: "✏️ 文章作成・校正",
     translate: "🌐 翻訳",
+    pdf: "📄 文章要約",
     brainstorm: "💡 ブレインストーミング",
     disease: "🏥 疾患解説",
     ddx: "💊 鑑別診断",
-    pdf: "📄 文章要約",
     review: "📝 論文査読",
     stats: "📈 統計解析",
     email: "✉️ 英文メール作成",
+    coding: "💻 プログラミング",
   });
 
   /** @param {string} key */
@@ -4055,8 +4417,19 @@ AI応答テキスト:
   function wireSettingsEvents() {
     const save = saveSettingsFromUI;
 
+    el.baseUrlPreset.onchange = () => {
+      if (el.baseUrlPreset.value === "custom") {
+        el.baseUrl.style.display = "";
+        el.baseUrl.value = "";
+        el.baseUrl.focus();
+      } else {
+        el.baseUrl.style.display = "none";
+        el.baseUrl.value = el.baseUrlPreset.value;
+      }
+      save();
+    };
     el.baseUrl.onchange = save;
-    el.apiKey.onchange = save;
+    if (el.apiKey) el.apiKey.onchange = save;
 
     el.temperature.oninput = () => {
       el.tempValue.textContent = el.temperature.value;
@@ -4104,11 +4477,8 @@ AI応答テキスト:
     if (el.hideThinkingToggle) {
       el.hideThinkingToggle.onchange = save;
     }
-    if (el.disableThinkingToggle) {
-      el.disableThinkingToggle.onchange = save;
-    }
-    if (el.persistApiKeyToggle) {
-      el.persistApiKeyToggle.onchange = save;
+    if (el.enableQwen3ThinkingToggle) {
+      el.enableQwen3ThinkingToggle.onchange = save;
     }
 
     // v1.7.2: System Promptプリセット
@@ -4380,10 +4750,11 @@ AI応答テキスト:
     updateHelpButton();
 
     if (helpMode) {
-      // マニュアルを事前ロード（キャッシュに格納）
-      getManualContent().catch(() => {});
-      notify("❓ ヘルプモード ON - アプリの使い方を質問してください");
+      // マニュアルを事前ロード（キャッシュに格納）→ 完了後にヘルプパネル表示
+      getManualContent().then(() => showHelpPanel()).catch(() => showHelpPanel());
     } else {
+      hideHelpPanel();
+      if (messages.length === 0) showWelcomeScreen();
       notify("❓ ヘルプモード OFF");
     }
   }

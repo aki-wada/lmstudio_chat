@@ -63,6 +63,16 @@
 
   <!-- ===== 基本タブ ===== -->
   <div class="settings-tab-content active" id="tab-basic">
+    <div class="settings-row">
+      <label>🖥️ 接続先サーバー:</label>
+      <select id="baseUrlPreset" style="width:140px">
+        <option value="http://localhost:1234/v1">LM Studio</option>
+        <option value="http://localhost:11434/v1">Ollama</option>
+        <option value="custom">カスタム</option>
+      </select>
+      <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:200px; display:none" placeholder="http://..." />
+    </div>
+    <div class="settings-section-border"></div>
     <div class="settings-columns">
       <div class="settings-col">
         <div class="settings-row">
@@ -118,15 +128,15 @@
   <!-- ===== プロンプトタブ ===== -->
   <div class="settings-tab-content" id="tab-prompt">
     <div class="settings-row">
-      <label>System Prompt:</label>
+      <label>システムプロンプト:</label>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
         <select id="systemPromptPresetSelect" style="flex:1;max-width:300px">
           <option value="">-- プリセットを選択 --</option>
         </select>
-        <button id="saveSystemPromptPresetBtn" style="background:#28a745;padding:4px 12px" title="現在のSystem Promptを新規プリセットとして保存">💾 保存</button>
+        <button id="saveSystemPromptPresetBtn" style="background:#28a745;padding:4px 12px" title="現在のシステムプロンプトを新規プリセットとして保存">💾 保存</button>
         <button id="deleteSystemPromptPresetBtn" style="background:#dc3545;padding:4px 12px" title="選択中のプリセットを削除">🗑</button>
       </div>
-      <textarea id="systemPrompt">あなたは優秀なAIアシスタントです。ユーザーの質問に対して、正確で分かりやすい回答を日本語で提供してください。必要に応じて具体例や補足を加え、専門用語には簡単な説明を添えてください。</textarea>
+      <textarea id="systemPrompt" style="min-height:160px">あなたは優秀なAIアシスタントです。ユーザーの質問に対して、正確で分かりやすい回答を日本語で提供してください。必要に応じて具体例や補足を加え、専門用語には簡単な説明を添えてください。</textarea>
     </div>
     <div class="settings-section-border"></div>
     <div class="settings-row"><label>📋 プリセット編集</label></div>
@@ -156,6 +166,10 @@
     <div class="settings-columns">
       <div class="settings-col">
         <div class="settings-row">
+          <label>Max Tokens:</label>
+          <input type="number" id="maxTokens" min="1" max="8192" value="2048" />
+        </div>
+        <div class="settings-row">
           <label>応答スタイル:</label>
           <select id="responseStyle">
             <option value="concise">簡潔</option>
@@ -172,50 +186,28 @@
             <option value="ko">한국어</option>
           </select>
         </div>
+      </div>
+      <div class="settings-col">
         <div class="settings-row">
           <label>Temperature:</label>
           <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />
           <span id="tempValue">0.7</span>
         </div>
       </div>
-      <div class="settings-col">
-        <div class="settings-row">
-          <label>Max Tokens:</label>
-          <input type="number" id="maxTokens" min="1" max="8192" value="2048" />
-        </div>
-        <div class="settings-row">
-          <label>Reasoning Effort:</label>
-          <select id="reasoningEffort">
-            <option value="">指定なし</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="settings-row">
-      <label><input type="checkbox" id="hideThinkingToggle" /> 🧠 思考プロセスを非表示</label>
-    </div>
-    <div class="settings-row">
-      <label><input type="checkbox" id="disableThinkingToggle" /> 🚫 Thinkingモード無効化<small style="color:#888;margin-left:4px">（Qwen等）</small></label>
     </div>
     <div class="settings-section-border"></div>
     <div class="settings-row">
-      <label>🔗 Base URL:</label>
-      <input type="text" id="baseUrl" value="http://localhost:1234/v1" style="width:200px" />
-    </div>
-    <div class="settings-row">
-      <label>🔑 API Key:</label>
-      <input type="password" id="apiKey" value="lmstudio" style="width:180px" autocomplete="off" />
-    </div>
-    <div class="settings-row">
-      <label><input type="checkbox" id="persistApiKeyToggle" /> この端末にAPI鍵を保存する</label>
-      <small style="color:#888;margin-left:4px">（OFFならタブを閉じると消去）</small>
-    </div>
-    <div class="settings-row">
       <label><input type="checkbox" id="autoUnloadToggle" /> 🔄 モデル切替時に自動アンロード</label>
     </div>
+    <div class="settings-section-border"></div>
+    <div class="settings-row"><label>🧠 Thinking 設定</label></div>
+    <div class="settings-row">
+      <label><input type="checkbox" id="hideThinkingToggle" /> 思考プロセスを非表示</label>
+    </div>
+    <div class="settings-row">
+      <label><input type="checkbox" id="enableQwen3ThinkingToggle" /> Qwen3のThinkingを有効化<small style="color:#888;margin-left:4px">（デフォルト: 無効）</small></label>
+    </div>
+    <!-- Reasoning Effort 削除: ローカルLLMでは効果なし -->
     <div class="settings-section-border"></div>
     <div class="settings-row">
       <label>👁️ 表示モデル管理</label>
@@ -228,20 +220,24 @@
 
   <!-- ===== データタブ ===== -->
   <div class="settings-tab-content" id="tab-data">
-    <div class="settings-row"><label>💬 会話ログ管理</label></div>
+    <div class="settings-row"><label>💬 会話の保存・切り替え</label></div>
+    <div style="font-size:0.8em;color:#888;margin-bottom:4px;line-height:1.5">
+      会話を話題ごとに分けて保存できます。「新規チャット」で新しい会話を始め、リストから過去の会話に戻れます。
+    </div>
     <div class="settings-row">
       <span id="sessionCount" style="font-size:0.85em;color:#666">保存ログ: 0件</span>
       <button id="createSessionBtn" style="background:#17a2b8;padding:4px 12px;font-size:0.85em">＋ 新規チャット</button>
     </div>
     <div id="sessionList" class="session-list"></div>
     <div class="settings-section-border"></div>
-    <div class="settings-row"><label>🔧 データ管理</label></div>
+    <div class="settings-row"><label>🔧 リセット・初期化</label></div>
     <div class="settings-row">
       <button id="resetSettingsBtn" style="background:#ffc107;color:#000">🔄 設定をデフォルトに戻す</button>
       <button id="clearAllDataBtn" style="background:#dc3545">🗑 すべての保存データを消す</button>
     </div>
     <div style="font-size:0.8em;color:#888;margin-top:2px;line-height:1.5">
-      ※「すべての保存データを消す」を実行すると、会話履歴・設定・プリセット・セッションなど、このアプリの全データが初期化されます。
+      「設定をデフォルトに戻す」→ 設定のみ初期化（会話は残ります）<br>
+      「すべての保存データを消す」→ 会話履歴・設定・プリセットなど全データを初期化（元に戻せません）
     </div>
   </div>
 

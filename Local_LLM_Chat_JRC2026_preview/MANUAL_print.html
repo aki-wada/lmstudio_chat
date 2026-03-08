@@ -290,6 +290,33 @@
 </ul>
 <p>迷った場合は <strong>Q4_K_M</strong> を選ぶのがおすすめです。</p>
 
+<h3>コラム: LM Studio の「Staff Picks」とは</h3>
+<p>LM Studio のモデルブラウザに表示される <strong>Staff Picks</strong> は、LM Studio 開発チームが「おすすめ」として選んだモデルのリストです。「迷ったらこれを使えばOK」というリストと考えてください。</p>
+
+<h4>選定基準</h4>
+<table>
+  <tr><th>基準</th><th>内容</th></tr>
+  <tr><td>性能</td><td>同サイズ帯で高い性能</td></tr>
+  <tr><td>安定性</td><td>幻覚や破綻が少ない</td></tr>
+  <tr><td>量子化品質</td><td>GGUF 量子化の品質が良い</td></tr>
+  <tr><td>速度</td><td>一般 GPU / Apple Silicon で動きやすい</td></tr>
+  <tr><td>人気</td><td>コミュニティ評価が高い</td></tr>
+</table>
+
+<h4>よく選ばれるモデル（時期により変動）</h4>
+<p>Qwen2.5-7B/14B、Mistral 7B Instruct、DeepSeek R1 Distill、Gemma 2、Llama 3 Instruct など。</p>
+
+<h4>研究用途での位置づけ</h4>
+<p>Staff Picks は一般用途向けの推薦であり、特定の専門領域に最適化されたモデルではありません。研究用途ではベースライン比較モデルとして活用し、専門タスクには専用モデルを検討するとよいでしょう。</p>
+<table>
+  <tr><th>用途</th><th>推奨モデル</th></tr>
+  <tr><td>一般 LLM ベースライン</td><td>Staff Picks のモデル</td></tr>
+  <tr><td>医療特化</td><td>MedGemma / BioMed 系</td></tr>
+  <tr><td>日本語重視</td><td>Qwen シリーズ</td></tr>
+  <tr><td>推論・深い思考</td><td>DeepSeek / gpt-oss</td></tr>
+</table>
+<p>迷ったらまず Staff Picks から試し、用途に応じて専門モデルに切り替えるのが効率的です。</p>
+
 <hr>
 
 <h2>起動方法（v0.4.1前提）</h2>
