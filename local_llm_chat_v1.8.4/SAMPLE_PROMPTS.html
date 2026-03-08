@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>サンプルプロンプト集 — JRC 2026</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Helvetica Neue","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:#0f0f23;color:#e0e0f0;line-height:1.7;padding:0;
+}
+/* --- sidebar nav --- */
+.layout{display:flex;min-height:100vh}
+nav.sidebar{
+  position:sticky;top:0;height:100vh;width:260px;min-width:260px;
+  background:#12122a;border-right:1px solid #2a2a4a;
+  overflow-y:auto;padding:16px 0;font-size:13px;
+}
+nav.sidebar::-webkit-scrollbar{width:4px}
+nav.sidebar::-webkit-scrollbar-thumb{background:#333}
+nav.sidebar .nav-title{
+  font-size:14px;font-weight:700;color:#00d4ff;
+  padding:8px 16px 12px;border-bottom:1px solid #2a2a4a;margin-bottom:8px;
+}
+nav.sidebar a{
+  display:block;padding:6px 16px;color:#b0b0c0;text-decoration:none;
+  border-left:3px solid transparent;transition:all .15s;
+}
+nav.sidebar a:hover,nav.sidebar a.active{
+  color:#fff;background:#1a1a35;border-left-color:#007bff;
+}
+nav.sidebar a.sub{padding-left:28px;font-size:12px;color:#8888a0}
+nav.sidebar a.sub:hover{color:#ccc}
+/* --- main content --- */
+main{flex:1;max-width:900px;padding:32px 40px 60px;margin:0 auto}
+h1{font-size:28px;color:#fff;margin-bottom:4px}
+.subtitle{font-size:14px;color:#00d4ff;margin-bottom:24px}
+.intro{font-size:14px;color:#b0b0c0;margin-bottom:32px;line-height:1.8}
+h2{
+  font-size:22px;color:#fff;margin:40px 0 8px;padding-top:20px;
+  border-bottom:2px solid #007bff;padding-bottom:8px;
+}
+h3{font-size:17px;color:#00d4ff;margin:24px 0 8px}
+p{margin:8px 0;color:#c8c8d8;font-size:14.5px}
+strong{color:#fff}
+hr{border:none;border-top:1px solid #2a2a4a;margin:28px 0}
+blockquote{
+  border-left:3px solid #007bff;padding:10px 16px;margin:12px 0;
+  background:#1a1a30;border-radius:4px;color:#c0c0d0;font-size:13.5px;
+}
+/* --- tables --- */
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+th{background:#1e1e38;color:#00d4ff;text-align:left;padding:8px 12px;border:1px solid #2a2a4a}
+td{padding:8px 12px;border:1px solid #2a2a4a;color:#c8c8d8}
+tr:nth-child(even) td{background:#14142a}
+/* --- prompt card --- */
+.prompt-card{
+  position:relative;background:#1a1a2e;border:1px solid #2a2a4a;
+  border-radius:8px;margin:12px 0 20px;overflow:hidden;
+}
+.prompt-card pre{
+  margin:0;padding:16px 16px 16px 16px;
+  font-family:"SF Mono","Fira Code","Consolas",monospace;
+  font-size:13.5px;line-height:1.65;color:#e8e8f8;
+  white-space:pre-wrap;word-wrap:break-word;
+  overflow-x:auto;
+}
+.copy-btn{
+  position:absolute;top:8px;right:8px;
+  background:#007bff;color:#fff;border:none;border-radius:5px;
+  padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .2s;z-index:2;
+}
+.copy-btn:hover{background:#0062d6}
+.copy-btn.copied{background:#28a745}
+/* --- ordered/unordered lists --- */
+ul,ol{margin:8px 0 8px 24px;color:#c8c8d8;font-size:14px}
+li{margin:4px 0}
+/* --- tips section --- */
+.tips{
+  background:#1e1e38;border:1px solid #2a2a4a;border-radius:8px;
+  padding:20px 24px;margin:20px 0;
+}
+.tips li{margin:6px 0}
+/* --- footer --- */
+footer{text-align:center;color:#666;font-size:12px;padding:20px;margin-top:40px}
+/* --- responsive --- */
+@media(max-width:800px){
+  nav.sidebar{display:none}
+  main{padding:20px 16px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ===== Sidebar Navigation ===== -->
+<nav class="sidebar" id="sideNav">
+  <div class="nav-title">サンプルプロンプト集</div>
+  <a href="#sec1">1. 基本的な質問</a>
+  <a href="#sec2">2. 文章リライト・校正</a>
+  <a href="#sec3">3. 翻訳</a>
+  <a href="#sec4">4. 画像所見の記載支援</a>
+  <a href="#sec5">5. 鑑別診断</a>
+  <a href="#sec6">6. 患者説明文の作成</a>
+  <a href="#sec7">7. 論文・文献関連</a>
+  <a href="#sec8">8. プリセットプロンプト</a>
+  <a href="#sec9">9. 深掘りモード</a>
+  <a href="#sec10">10. ファイル添付</a>
+  <a href="#sec11">11. モデル選びの豆知識</a>
+  <a href="#sec12">12. プロンプトエンジニアリング</a>
+  <a href="#sec12-rtf" class="sub">RTF</a>
+  <a href="#sec12-rice" class="sub">RICE</a>
+  <a href="#sec12-cot" class="sub">Chain of Thought</a>
+  <a href="#sec12-fewshot" class="sub">Few-shot</a>
+  <a href="#sec12-constraint" class="sub">制約付き</a>
+  <a href="#sec12-prep" class="sub">PREP法</a>
+  <a href="#sec12-pdca" class="sub">PDCA</a>
+  <a href="#sec12-swot" class="sub">SWOT</a>
+  <a href="#sec12-sixhats" class="sub">6つの思考の帽子</a>
+  <a href="#sec12-debate" class="sub">無限議論</a>
+  <a href="#sec12-compare" class="sub">比較</a>
+  <a href="#sec13">13. 回答を良くするテクニック</a>
+  <a href="#tips">Tips</a>
+</nav>
+
+<!-- ===== Main Content ===== -->
+<main>
+
+<h1>LLMとの会話 サンプルプロンプト集</h1>
+<div class="subtitle">JRC 2026 ハンズオンセミナー配布資料 — Local LLM Chat v1.8.4</div>
+<p class="intro">このプロンプト集は、ハンズオン中にコピー＆ペーストしてお試しいただけるサンプルです。<br>
+各プロンプトの右上にある「コピー」ボタンをクリックすると、クリップボードにコピーされます。<br>
+左画面の Local LLM Chat に貼り付けて送信してみてください。</p>
+<p class="intro" style="background:#1a1a30;border-radius:8px;padding:12px 16px;border-left:3px solid #00d4ff">
+💡 <strong>初めての方へ</strong>：まずはセクション1の簡単な質問から試してみましょう。<br>
+慣れてきたら、セクション8の「プリセット」機能を使うと、よく使うプロンプトをワンクリックで呼び出せます。<br>
+セクション12以降は上級者向けのテクニックです。最初は読み飛ばしてOKです。</p>
+
+<!-- ==================== 1 ==================== -->
+<h2 id="sec1">1. 基本的な質問（ウォームアップ）</h2>
+<p>まずはシンプルな質問で、ローカルLLMの応答を体験してみましょう。<br>
+どんな質問でもOKです。気軽に話しかけてみてください。</p>
+
+<h3>1-1. まずは気軽に聞いてみよう</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>カレーライスの美味しい作り方を教えてください。</pre></div>
+
+<h3>1-2. 知識を聞く</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>放射線科で使われる主なモダリティを5つ挙げて、それぞれの特徴を1行で説明してください。</pre></div>
+
+<h3>1-3. リスト生成</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>医療AIの活用が期待されている分野を5つ教えてください。</pre></div>
+
+<h3>1-4. 日常的な相談</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>明日、初めて学会発表をします。緊張しないためのコツを5つ教えてください。</pre></div>
+
+<hr>
+
+<!-- ==================== 2 ==================== -->
+<h2 id="sec2">2. 文章のリライト・校正</h2>
+<p>日常業務で使える汎用的なテキスト処理です。</p>
+
+<h3>2-1. 文章を簡潔にする</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下の文章をもっと簡潔にしてください：
+
+「本検査は、X線を用いて体内の断層画像を撮影するものであり、検査時間は概ね10分から15分程度を要し、造影剤を使用する場合にはアレルギー反応等の副作用が生じる可能性があるため、事前に同意書への署名をお願いしております。」</pre></div>
+
+<h3>2-2. 敬語の調整</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下の文章を、患者さん向けのやさしい表現に書き換えてください：
+
+「造影CT検査において、非イオン性ヨード造影剤を経静脈的に投与し、動脈相・門脈相・平衡相の3相で撮影を実施する。」</pre></div>
+
+<hr>
+
+<!-- ==================== 3 ==================== -->
+<h2 id="sec3">3. 翻訳</h2>
+
+<h3>3-1. 日本語→英語</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>次の文を英語に翻訳してください：
+
+「造影CTにて肝右葉に早期濃染を示す腫瘤を認めます。門脈相ではwashoutを呈しており、肝細胞癌が疑われます。」</pre></div>
+
+<h3>3-2. 英語→日本語</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>次の英文を日本語に翻訳してください：
+
+"A well-defined, round, homogeneous lesion was identified in the right lower lobe of the lung on the chest CT. The lesion measures approximately 12mm in diameter and demonstrates no contrast enhancement."</pre></div>
+
+<hr>
+
+<!-- ==================== 4 ==================== -->
+<h2 id="sec4">4. 画像所見の記載支援</h2>
+<p>放射線科レポートの下書き作成に活用できます。</p>
+
+<h3>4-1. 胸部CT所見</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>胸部CTで右肺上葉に径15mmのすりガラス影を認めました。周囲に気管支拡張や胸膜陥入像はありません。所見文を書いてください。</pre></div>
+
+<h3>4-2. 頭部MRI所見</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>頭部MRIで左側頭葉内側にFLAIRで高信号を示す領域を認めます。拡散強調像で高信号、ADCマップで低信号です。所見文と考えられる診断を記載してください。</pre></div>
+
+<h3>4-3. 正常所見テンプレート</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>腹部造影CTの正常所見テンプレートを作成してください。以下の項目を含めてください：
+- 肝臓、胆嚢、膵臓、脾臓、腎臓
+- 大動脈、下大静脈
+- 腹腔内リンパ節
+- 腹水の有無</pre></div>
+
+<hr>
+
+<!-- ==================== 5 ==================== -->
+<h2 id="sec5">5. 鑑別診断</h2>
+
+<h3>5-1. 肝腫瘤</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>50歳女性。造影MRIで肝S6に径3cmの腫瘤を認めます。
+- T1WI: 低信号
+- T2WI: 高信号
+- 動脈相: 濃染
+- 門脈相: washout
+- 肝細胞相: 低信号
+
+鑑別診断を3つ挙げて、それぞれの根拠を説明してください。</pre></div>
+
+<h3>5-2. 肺結節</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>65歳男性、喫煙歴あり。胸部CTで右肺下葉に径20mmの充実性結節を認めます。辺縁は不整で、スピキュラを伴っています。胸膜陥入像あり。縦隔リンパ節腫大なし。
+
+鑑別診断と推奨される次のステップを教えてください。</pre></div>
+
+<hr>
+
+<!-- ==================== 6 ==================== -->
+<h2 id="sec6">6. 患者説明文の作成</h2>
+
+<h3>6-1. 検査説明</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>腰椎MRI検査を受ける患者さんに、検査の流れと注意点をわかりやすく説明する文章を作ってください。医療用語はできるだけ避けてください。</pre></div>
+
+<h3>6-2. 検査結果の説明</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>腰椎MRIでL4/5椎間板ヘルニアが見つかりました。患者さんにわかりやすく説明する文章を作ってください。以下の点を含めてください：
+- ヘルニアとは何か
+- なぜ症状が出るのか
+- 今後の治療の選択肢</pre></div>
+
+<hr>
+
+<!-- ==================== 7 ==================== -->
+<h2 id="sec7">7. 論文・文献関連</h2>
+
+<h3>7-1. アブストラクト要約</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下のAbstractを日本語で要約してください。要点を箇条書きで示してください：
+
+"Purpose: To evaluate the diagnostic performance of deep learning-based computer-aided detection (DL-CAD) for pulmonary nodule detection on low-dose chest CT in a lung cancer screening setting. Materials and Methods: This retrospective study included 1,200 low-dose chest CT examinations. DL-CAD performance was compared with that of experienced radiologists. Sensitivity, specificity, and area under the receiver operating characteristic curve (AUC) were calculated. Results: DL-CAD achieved a sensitivity of 94.2% and specificity of 88.7%, with an AUC of 0.95. The mean reading time was reduced by 35% when radiologists used DL-CAD as a second reader."</pre></div>
+
+<h3>7-2. 研究デザインの相談</h3>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>「胸部単純X線における肺結節の見落とし率をAI支援の有無で比較する」研究を計画しています。適切な研究デザイン、必要なサンプルサイズの考え方、主要評価項目を提案してください。</pre></div>
+
+<hr>
+
+<!-- ==================== 8 ==================== -->
+<h2 id="sec8">8. プリセットプロンプトの活用</h2>
+<p>Local LLM Chatには、よく使うプロンプトを📋ボタンからワンクリックで呼び出せる「プリセット」機能があります。</p>
+
+<table>
+<thead><tr><th>プリセット</th><th>使い方の例</th></tr></thead>
+<tbody>
+<tr><td>✏️ 文章作成・校正</td><td>「以下の文章を校正してください：〜」</td></tr>
+<tr><td>🌐 翻訳</td><td>「次の文を英語に翻訳してください：〜」</td></tr>
+<tr><td>📄 文章要約</td><td>長文を貼り付けて要約を生成</td></tr>
+<tr><td>💡 ブレインストーミング</td><td>「放射線科の業務効率化のアイデアを5つ」</td></tr>
+<tr><td>🏥 疾患解説</td><td>「肺塞栓症」と入力するだけで構造化された解説を生成</td></tr>
+<tr><td>💊 鑑別診断</td><td>臨床・画像情報を入力すると鑑別リストを生成</td></tr>
+<tr><td>📝 論文査読</td><td>研究内容を貼り付けると査読コメントを生成</td></tr>
+<tr><td>📈 統計解析</td><td>データの種類と目的を入力すると適切な手法を提案</td></tr>
+<tr><td>✉️ 英文メール作成</td><td>相手・用件・トーンを入力すると英文メールを生成</td></tr>
+<tr><td>💻 プログラミング</td><td>「Pythonで画像をリサイズするコードを書いてください」</td></tr>
+</tbody>
+</table>
+
+<h3>プリセットの使い方</h3>
+<ol>
+  <li>入力欄の左にある「📋」ボタンをクリック</li>
+  <li>使いたいプリセットを選択</li>
+  <li>テンプレートが入力欄に挿入される</li>
+  <li>【 】の部分に具体的な内容を入力して送信</li>
+</ol>
+
+<hr>
+
+<!-- ==================== 9 ==================== -->
+<h2 id="sec9">9. 深掘りモードの体験</h2>
+<p>入力欄の「🔍 深掘り」ボタンをONにすると、より詳細で多角的な回答が得られます。</p>
+
+<h3>通常モードとの比較</h3>
+<p>以下のプロンプトを、深掘りモード OFF → ON の順で試して、回答の違いを比較してみてください：</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>MRIのT2強調画像で高信号を示す病変にはどのようなものがありますか？</pre></div>
+
+<hr>
+
+<!-- ==================== 10 ==================== -->
+<h2 id="sec10">10. ファイル添付の活用</h2>
+<p>📎ボタンからテキストファイルやPDFを添付できます。</p>
+
+<h3>活用例</h3>
+<ul>
+  <li><strong>PDF論文を添付</strong> →「この論文の要点を日本語で3つにまとめてください」</li>
+  <li><strong>CSVデータを添付</strong> →「このデータの概要を説明してください」</li>
+  <li><strong>プログラムコードを添付</strong> →「このコードの処理内容を説明してください」</li>
+</ul>
+<p style="color:#888;font-size:13px">※ テキスト上限は約30,000文字です。大きなファイルは先頭部分のみ読み込まれます。</p>
+
+<hr>
+
+<!-- ==================== 11 ==================== -->
+<h2 id="sec11">11. モデル選びの豆知識</h2>
+<p>LLMにはたくさんの種類があります。ここでは、モデルを選ぶときに知っておくと役立つ基礎知識をまとめました。</p>
+
+<h3>モデルサイズの読み方</h3>
+<p>モデル名についている <strong>8B</strong> や <strong>30B</strong> は「パラメータ数」（B = Billion = 10億）を表します。<br>
+一般に、数字が大きいほど賢く、そのぶんPCへの負荷も大きくなります。</p>
+
+<table>
+<thead><tr><th>サイズ帯</th><th>パラメータ数</th><th>必要メモリ（目安）</th><th>特徴</th></tr></thead>
+<tbody>
+<tr><td>小型</td><td>1B〜4B</td><td>2〜4 GB</td><td>高速だが精度は低め。単純な質問やOCR向き</td></tr>
+<tr><td>中型</td><td>7B〜12B</td><td>5〜8 GB</td><td>日常利用に十分。速度と精度のバランスが良い</td></tr>
+<tr><td>大型</td><td>14B〜32B</td><td>10〜20 GB</td><td>高精度。長文や専門的な内容に強い</td></tr>
+<tr><td>超大型</td><td>70B以上</td><td>40 GB以上</td><td>最高精度だが、高性能GPUが必要</td></tr>
+</tbody>
+</table>
+<p style="color:#888;font-size:13px">※ 必要メモリはモデルの量子化方式（Q4, Q8等）により大きく変わります。</p>
+
+<h3>代表的なオープンソースLLM</h3>
+<table>
+<thead><tr><th>モデル名</th><th>開発元</th><th>サイズ展開</th><th>得意なこと</th></tr></thead>
+<tbody>
+<tr><td><strong>Qwen3</strong></td><td>Alibaba</td><td>0.6B〜235B</td><td>日本語が得意。汎用性が高く、Thinking（思考）モードも搭載</td></tr>
+<tr><td><strong>Qwen3-VL</strong></td><td>Alibaba</td><td>8B / 30B</td><td>画像の理解・説明（Vision対応）。写真やスクリーンショットの分析</td></tr>
+<tr><td><strong>Gemma 3</strong></td><td>Google</td><td>1B〜27B</td><td>バランスの良い汎用モデル。英語の精度が高い</td></tr>
+<tr><td><strong>Llama 4</strong></td><td>Meta</td><td>Scout / Maverick</td><td>多言語対応。大規模コンテキストに強い</td></tr>
+<tr><td><strong>GPT-oss</strong></td><td>OpenAI</td><td>20B / 120B</td><td>OpenAI初のオープンモデル。高い推論能力と指示追従性</td></tr>
+<tr><td><strong>Mistral</strong></td><td>Mistral AI</td><td>7B〜Large</td><td>コード生成と論理的思考。英語中心</td></tr>
+<tr><td><strong>Phi-4</strong></td><td>Microsoft</td><td>14B</td><td>小さくても賢い。数学・推論タスクに強い</td></tr>
+<tr><td><strong>MedGemma</strong></td><td>Google</td><td>4B</td><td>医療特化モデル。臨床テキストの理解</td></tr>
+<tr><td><strong>GLM-OCR</strong></td><td>Zhipu AI</td><td>2B</td><td>文書・表・数式のOCR（文字読み取り）に特化</td></tr>
+</tbody>
+</table>
+
+<h3>用途別おすすめの選び方</h3>
+<table>
+<thead><tr><th>やりたいこと</th><th>おすすめモデル</th><th>ポイント</th></tr></thead>
+<tbody>
+<tr><td>日本語で質問・相談</td><td>Qwen3 8B / 30B</td><td>日本語の精度が高く、最初の1台に最適</td></tr>
+<tr><td>英語論文の読解・翻訳</td><td>Qwen3 30B / Gemma 27B</td><td>大きめのモデルほど翻訳品質が向上</td></tr>
+<tr><td>画像を見せて質問</td><td>Qwen3-VL 8B / 30B</td><td>Vision対応モデルが必要（👁️マーク付き）</td></tr>
+<tr><td>高精度な推論・複雑な質問</td><td>GPT-oss 120B / Qwen3 30B</td><td>大型モデルほど論理的思考が正確</td></tr>
+<tr><td>プログラミング</td><td>GPT-oss 20B / Qwen3 30B</td><td>コード生成はモデルサイズが大きいほど正確</td></tr>
+<tr><td>高速に回答がほしい</td><td>Qwen3 8B / Gemma 12B</td><td>中型モデルならサクサク動く</td></tr>
+<tr><td>文書のOCR</td><td>GLM-OCR</td><td>画像から文字・表を抽出する専用モデル</td></tr>
+</tbody>
+</table>
+
+<h3>知っておくと便利な豆知識</h3>
+<div class="tips">
+<ul>
+  <li><strong>量子化（Quantization）</strong>：モデルを圧縮して軽くする技術。Q4（4bit）は軽い代わりにやや精度が落ち、Q8（8bit）は精度を保つ代わりにメモリを多く使います</li>
+  <li><strong>コンテキスト長</strong>：一度に処理できる文字数の上限。長い文書を扱うなら、コンテキスト長が大きいモデルを選びましょう</li>
+  <li><strong>Thinking（思考）モード</strong>：Qwen3などが搭載。回答前に「考える過程」を踏むため精度が上がりますが、応答に時間がかかります</li>
+  <li><strong>Vision対応</strong>：画像を理解できるモデル。モデル名に「VL」や「Vision」が付いているものが対応しています</li>
+  <li><strong>迷ったらまずQwen3 8B</strong>：日本語対応・中型・高速で、初めてのローカルLLMに最適です</li>
+</ul>
+</div>
+
+<hr>
+
+<!-- ==================== 12 ==================== -->
+<h2 id="sec12">12. プロンプトエンジニアリング — フレームワーク活用例</h2>
+<p style="background:#2a1a1a;border:1px solid #4a3a3a;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13.5px;color:#ffcc80">
+📚 <strong>上級者向け</strong>：このセクション以降は、LLMの使い方に慣れてきた方向けの内容です。<br>
+初めての方は、まずセクション1〜11を試してからお読みください。</p>
+<p>プロンプトの書き方を少し工夫するだけで、LLMの回答品質は大きく変わります。<br>
+ここでは代表的なフレームワークと、放射線科での具体例を紹介します。</p>
+
+<h3>フレームワーク一覧</h3>
+<table>
+<thead><tr><th>フレームワーク</th><th>構成要素</th><th>特徴</th></tr></thead>
+<tbody>
+<tr><td><strong>RTF</strong></td><td>Role / Task / Format</td><td>シンプルで汎用的</td></tr>
+<tr><td><strong>RICE</strong></td><td>Role / Instruction / Context / Example</td><td>文脈と例示で精度向上</td></tr>
+<tr><td><strong>Chain of Thought</strong></td><td>段階的に考えさせる</td><td>推論タスクに強い</td></tr>
+<tr><td><strong>Few-shot</strong></td><td>入出力の例を提示</td><td>出力形式を正確に制御</td></tr>
+<tr><td><strong>制約付きプロンプト</strong></td><td>条件・制約を明示</td><td>不要な出力を排除</td></tr>
+<tr><td><strong>PREP法</strong></td><td>Point / Reason / Example / Point</td><td>説得力のある説明・報告</td></tr>
+<tr><td><strong>PDCA サイクル</strong></td><td>Plan / Do / Check / Act</td><td>改善・業務プロセス設計</td></tr>
+<tr><td><strong>SWOT 分析</strong></td><td>Strengths / Weaknesses / Opportunities / Threats</td><td>意思決定・戦略検討</td></tr>
+<tr><td><strong>6つの思考の帽子</strong></td><td>白/赤/黒/黄/緑/青の視点</td><td>多角的・網羅的な分析</td></tr>
+<tr><td><strong>無限議論</strong></td><td>司会+複数専門家のロールプレイ</td><td>多角的な議論で結論を導く</td></tr>
+</tbody>
+</table>
+
+<!-- ----- RTF ----- -->
+<h3 id="sec12-rtf">RTF（Role / Task / Format）</h3>
+<p>役割・タスク・出力形式を明示するシンプルなフレームワークです。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>【Role】あなたは放射線診断専門医です。
+【Task】以下の胸部CT所見から、放射線科レポートの所見欄を作成してください。
+【Format】「所見」と「印象」に分けて記載してください。
+
+右肺下葉S8に径25mmの充実性結節あり。辺縁不整、スピキュラ(+)。
+右肺門リンパ節に短径12mmの腫大あり。胸水なし。</pre></div>
+
+<!-- ----- RICE ----- -->
+<h3 id="sec12-rice">RICE（Role / Instruction / Context / Example）</h3>
+<p>文脈情報と出力例を加えることで、より精度の高い回答を引き出します。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>【Role】あなたは放射線科のレポート作成を支援するアシスタントです。
+
+【Instruction】以下の臨床情報と画像所見から、鑑別診断を3つ挙げてください。
+各診断には自信度（%）と根拠を1行で記載してください。
+
+【Context】
+- 患者: 72歳男性、喫煙歴40年
+- 主訴: 2ヶ月間の体重減少と血痰
+- 画像: 胸部造影CTで右肺上葉に径35mmの不整形腫瘤、縦隔リンパ節腫大あり
+
+【Example（出力形式の例）】
+1. ○○○（自信度: 80%）— 根拠: ～～
+2. △△△（自信度: 15%）— 根拠: ～～
+3. □□□（自信度: 5%）— 根拠: ～～</pre></div>
+
+<!-- ----- Chain of Thought ----- -->
+<h3 id="sec12-cot">Chain of Thought（段階的思考）</h3>
+<p>「ステップごとに考えて」と指示することで、推論の質が向上します。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下の症例について、ステップごとに考えてから最終診断を述べてください。
+
+ステップ1: 提示された画像所見を整理する
+ステップ2: 所見から考えられる病態を列挙する
+ステップ3: 臨床情報と照合して鑑別を絞る
+ステップ4: 最も可能性の高い診断を結論づける
+
+【症例】
+45歳女性。頭痛と視野障害。
+頭部造影MRIでトルコ鞍上部に径30mmの腫瘤。
+T1WI等信号、T2WI高信号、均一に造影される。
+視交叉を上方から圧排している。</pre></div>
+
+<!-- ----- Few-shot ----- -->
+<h3 id="sec12-fewshot">Few-shot（例示型）</h3>
+<p>入力と出力のペアを提示して、同じ形式で回答させます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下の例に倣って、画像所見を英語に翻訳してください。
+
+例1:
+入力: 「肝右葉に径2cmの嚢胞を認める」
+出力: "A 2-cm cyst is noted in the right hepatic lobe."
+
+例2:
+入力: 「両側胸水を少量認める」
+出力: "Small bilateral pleural effusions are present."
+
+問題:
+入力: 「膵頭部に径15mmの低吸収域を認め、主膵管の拡張を伴う」
+出力:</pre></div>
+
+<!-- ----- 制約付き ----- -->
+<h3 id="sec12-constraint">制約付きプロンプト</h3>
+<p>不要な出力を防ぎ、必要な情報だけを得るための書き方です。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下の条件に従って回答してください：
+- 箇条書きで回答すること
+- 各項目は2行以内にすること
+- エビデンスレベルが低い情報には「※要確認」を付けること
+- 患者への直接的な診断告知に使える表現は避けること
+
+質問: 肺のすりガラス影（GGO）が見つかった場合、考えられる原因は何ですか？</pre></div>
+
+<!-- ----- PREP ----- -->
+<h3 id="sec12-prep">PREP法（Point / Reason / Example / Point）</h3>
+<p>Point（要点）→ Reason（理由）→ Example（具体例）→ Point（要点の繰り返し）で構成する説得力の高い文章構成法です。結論から述べるため短時間で伝わり、報告・プレゼン・文書作成に広く使えます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>以下のテーマについて、PREP法で説明文を作成してください。
+
+【P（Point / 要点）】まず結論を1〜2文で述べてください
+【R（Reason / 理由）】その結論に至る理由・根拠を述べてください
+【E（Example / 具体例）】理由を裏付ける具体的な事例やデータを示してください
+【P（Point / 要点の繰り返し）】最後に結論を再度述べ、聞き手の行動を促してください
+
+テーマ: 放射線科における読影レポートの構造化（テンプレート化）を推進すべきである
+対象: 部門会議での5分間のプレゼンテーション</pre></div>
+
+<!-- ----- PDCA ----- -->
+<h3 id="sec12-pdca">PDCAサイクル</h3>
+<p>Plan（計画）→ Do（実行）→ Check（評価）→ Act（改善）の4段階で考えさせるフレームワークです。業務改善やプロセス設計に向いています。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>放射線科の読影レポート作成業務について、PDCAサイクルに沿って改善案を提案してください。
+
+【Plan（計画）】現状の課題と改善目標を整理してください
+【Do（実行）】具体的な改善施策を3つ提案してください
+【Check（評価）】各施策の効果をどう測定するか示してください
+【Act（改善）】評価結果をもとに次のサイクルで何を見直すべきか述べてください
+
+現状の課題：
+- レポート作成に1件あたり平均15分かかっている
+- テンプレートが統一されておらず、記載漏れが発生する
+- 緊急所見の伝達が遅れることがある</pre></div>
+
+<!-- ----- SWOT ----- -->
+<h3 id="sec12-swot">SWOT分析</h3>
+<p>Strengths（強み）・Weaknesses（弱み）・Opportunities（機会）・Threats（脅威）の4象限で整理するフレームワークです。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>放射線科の日常業務にローカルLLMを導入することについて、SWOT分析を行ってください。
+
+以下の4項目それぞれについて、3つずつ挙げてください：
+
+- Strengths（強み）: ローカルLLM導入の利点
+- Weaknesses（弱み）: 導入における課題・限界
+- Opportunities（機会）: 今後期待できる発展・活用
+- Threats（脅威）: 注意すべきリスク・外部要因
+
+最後に、分析結果を踏まえた総合的な導入推奨度を述べてください。</pre></div>
+
+<!-- ----- 6つの思考の帽子 ----- -->
+<h3 id="sec12-sixhats">6つの思考の帽子（シックスハット法）</h3>
+<p>Edward de Bono が提唱した思考法で、6つの視点から1つのテーマを多角的に分析します。</p>
+<table>
+<thead><tr><th>帽子</th><th>視点</th></tr></thead>
+<tbody>
+<tr><td>白</td><td>客観的事実・データ</td></tr>
+<tr><td>赤</td><td>感情・直感</td></tr>
+<tr><td>黒</td><td>批判・リスク</td></tr>
+<tr><td>黄</td><td>楽観・メリット</td></tr>
+<tr><td>緑</td><td>創造・新しいアイデア</td></tr>
+<tr><td>青</td><td>全体の統括・結論</td></tr>
+</tbody>
+</table>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>「AI画像診断支援ソフトを放射線科に導入すべきか」について、6つの思考の帽子（シックスハット法）で分析してください。
+
+🎩 白い帽子（事実）: AI画像診断の現状の精度や導入実績のデータ
+🎩 赤い帽子（感情）: 放射線科医として感じる期待や不安
+🎩 黒い帽子（批判）: 導入のリスクや問題点
+🎩 黄色い帽子（楽観）: 導入によるメリットや成功の可能性
+🎩 緑の帽子（創造）: 従来にない新しい活用方法のアイデア
+🎩 青い帽子（統括）: 全体を踏まえた結論と推奨アクション
+
+各帽子について3〜5行で分析してください。</pre></div>
+
+<!-- ----- 無限議論 ----- -->
+<h3 id="sec12-debate">無限議論プロンプト</h3>
+<p>1つのLLMに複数の専門家を演じさせ、互いに議論させることで多角的な結論を導く手法です。水平思考を促し、一人では思いつかない視点が得られます。</p>
+
+<p><strong>基本形：</strong></p>
+<blockquote>あなたは{司会}、{専門家A}、{専門家B}の役割を持っています。今から質問者の{テーマ}について、呼び名で交互に発話させ課題と解決方法も混ぜながら、水平思考を使い議論してください。{ゴール}に向かって議論してください。かならず{ゴール}について結論を出してください。</blockquote>
+
+<p><strong>放射線科での活用例：</strong></p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>あなたは{司会}、{専門家A}、{専門家B}の役割を持っています。今から質問者の{テーマ}について、呼び名で交互に発話させ課題と解決方法も混ぜながら、水平思考を使い議論してください。{ゴール}に向かって議論してください。かならず{ゴール}について結論を出してください。
+
+各条件は以下の通りです。
+
+#条件
+
+{司会}：呼び名「田中教授」：放射線科の部門長。20年の臨床経験を持ち、業務効率と診断品質のバランスを重視する。
+
+{専門家A}：「山本医師」：AI画像診断に詳しい若手放射線科医。テクノロジー導入に積極的で、最新論文に精通している。
+
+{専門家B}：「佐藤医師」：ベテラン読影医。年間1万件以上の読影実績があり、AI依存のリスクや教育面への影響を懸念している。
+
+{テーマ}
+・放射線科の読影業務にAI支援ツールを導入すべきか。導入する場合、どのような運用ルールが必要か。
+
+{参考資料}
+無し
+
+{ゴール}
+・AI読影支援の具体的な導入計画（対象モダリティ、運用フロー、教育体制、評価基準）を策定し、3名が合意する結論を出す。</pre></div>
+
+<p><strong>議論を続けたい場合：</strong></p>
+<p>LLMが結論を出した後も、以下のように追加の論点を投げることで議論を継続できます。</p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>ありがとうございます。ではさらに以下の論点について、3名で議論を続けてください：
+・導入後に読影精度が低下した場合の撤退基準
+・研修医の教育プログラムへの影響</pre></div>
+
+<!-- ----- 比較 ----- -->
+<h3 id="sec12-compare">比較: 同じ質問でのプロンプトの違い</h3>
+<p>以下の3つを順番に試して、回答の違いを比較してみてください。</p>
+
+<p><strong>A. シンプルなプロンプト:</strong></p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>肺塞栓症について教えてください。</pre></div>
+
+<p><strong>B. RTFフレームワーク:</strong></p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>【Role】あなたは放射線診断専門医です。
+【Task】肺塞栓症について、画像診断の観点から解説してください。
+【Format】CT所見・MRI所見・鑑別診断の3項目に分けてください。</pre></div>
+
+<p><strong>C. RICE + 制約付き:</strong></p>
+<div class="prompt-card"><button class="copy-btn" onclick="copyPrompt(this)">コピー</button><pre>【Role】あなたは放射線科レジデント向けの教育担当医です。
+【Instruction】肺塞栓症の画像診断について教育用の解説を作成してください。
+【Context】対象はCT読影を始めたばかりの初期研修医です。
+【Example】各所見には「見落としやすいポイント」を1つずつ付記してください。
+
+制約:
+- 箇条書きを中心に、視覚的に見やすい構成にすること
+- 急性と慢性の違いを明確に区別すること</pre></div>
+
+<hr>
+
+<!-- ==================== 13 ==================== -->
+<h2 id="sec13">13. 回答を良くするテクニック集</h2>
+<p>AIの回答に満足できないとき、追加のテクニックを使って回答の質を引き上げることができます。<br>
+パワハラプロンプト、役割チェンジ、逆張り、審査員、メタ指示など10種類のテクニックを収録しています。</p>
+
+<div style="margin:20px 0;text-align:center">
+  <a href="ADVANCED_PROMPTS.html" style="display:inline-block;padding:16px 40px;background:#007bff;color:#fff;font-size:16px;font-weight:700;border-radius:8px;text-decoration:none;transition:background .2s" onmouseover="this.style.background='#0062d6'" onmouseout="this.style.background='#007bff'">回答を良くするテクニック集を開く</a>
+</div>
+<p style="color:#888;font-size:13px;text-align:center">※ 初回のみパスワードの入力が必要です</p>
+
+<hr>
+
+<!-- ==================== Tips ==================== -->
+<h2 id="tips">Tips</h2>
+<div class="tips">
+<ul>
+  <li><strong>応答が遅い場合</strong>: 設定で Max Tokens を小さくすると応答が速くなります</li>
+  <li><strong>回答の質を上げるには</strong>: 具体的な情報（年齢、性別、所見の詳細）をプロンプトに含めてください</li>
+  <li><strong>回答をやり直したい場合</strong>: メッセージの「🔄」ボタンで再生成できます</li>
+  <li><strong>前の入力を呼び出す</strong>: 入力欄で「↑」キーを押すと直前の入力内容が復元されます</li>
+</ul>
+</div>
+
+<footer>Local LLM Chat v1.8.4 — JRC2026 Edition</footer>
+
+</main>
+</div>
+
+<script>
+function copyPrompt(btn) {
+  const pre = btn.parentElement.querySelector("pre");
+  const text = pre.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = "コピー完了";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = "コピー";
+      btn.classList.remove("copied");
+    }, 1500);
+  }).catch(() => {
+    // file:// protocol fallback
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      btn.textContent = "コピー完了";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = "コピー";
+        btn.classList.remove("copied");
+      }, 1500);
+    } catch(e) {
+      btn.textContent = "失敗";
+      setTimeout(() => { btn.textContent = "コピー"; }, 1500);
+    }
+    document.body.removeChild(ta);
+  });
+}
+
+// sidebar active highlight on scroll
+const sections = document.querySelectorAll("h2[id], h3[id]");
+const navLinks = document.querySelectorAll("nav.sidebar a");
+window.addEventListener("scroll", () => {
+  let current = "";
+  for (const sec of sections) {
+    if (sec.getBoundingClientRect().top <= 120) current = sec.id;
+  }
+  navLinks.forEach(a => {
+    a.classList.toggle("active", a.getAttribute("href") === "#" + current);
+  });
+}, { passive: true });
+</script>
+</body>
+</html>
